@@ -1,0 +1,6 @@
+dataIntervalSeconds: 1800 # Defaults to 1800s (30 min) for the database, however any format is acceptable for a given database folder
+defaultDataType: 'float32' # Any numeric type acceptable, float32 & int32 preferred for optimizing precisions vs. storage requirements
+pythonTimeName: 'posittime_int64' # Filename of python time-trace (stored in posix format with int64 dtype)
+matlabTimeName: 'clean_tv' # Legacy variable to allow interoperability of generated database with Biomet.net
+intMask: -9999 # NO DATA value for integer data
+timezone: 'UTC' # defaults to UTC for simplicity, but can be set to any timezone on a site or data-source specific basis

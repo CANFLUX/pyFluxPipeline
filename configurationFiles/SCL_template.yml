@@ -1,89 +1,87 @@
-projectPath: testing/projectPath
-sites:
-  SCL:
-    siteID: SCL
-    lat_lon: [69.2264167, -135.2519067]
-    dataLoggers:
-      main:
-        dateIn: &V1_dateIn 2024-07-10T00:00:00
-        modelName: CR1000x
-        serialNumber: 1
-      winterMet:
-        dateIn: 2024-09-15
-        dateOut: 2025-06-19
-        modelName: CR10x
-        serialNumber: 1
-      aux1:
-        dateIn: *V1_dateIn
-        modelName: HOBO
-        serialNumber: 1
-      aux2:
-        dateIn: *V1_dateIn
-        modelName: HOBO
-        serialNumber: 2
-    sensors:
-      CSAT3-UBC:
-        modelName: CSAT3
-        serialNumber: 1
-        dateIn: *V1_dateIn
-        dateOut: &V1_dateOut 2024-09-15T00:00:00
-        sensorType: sonic
-        Zm: &V1_Zm 3.285
-        northOffset: &V1_northOffset 33.0
-      LI7500-UBC:
-        modelName: LI7500
-        serialNumber: 1
-        dateIn: *V1_dateIn
-        dateOut: *V1_dateOut
-        sensorType: irga
-        northOffset: *V1_northOffset
-        xSeparation: 0.15
-        ySeparation: -0.06
-        verticalSeparation: 0
-      LI7700-UBC: 
-        modelName: LI7700
-        serialNumber: 1
-        dateIn: *V1_dateIn
-        dateOut: *V1_dateOut
-        sensorType: irga
-        northOffset: *V1_northOffset
-        xSeparation: 0.23
-        ySeparation: -0.14
-        verticalSeparation: 0
-      IRGASON:
-        modelName: IRGASON
-        serialNumber: 1
-        dateIn: &V2_dateIn 2025-08-01T00:00:00
-        sensorType: sonic-irga
-        Zm: *V1_Zm
-        northOffset: *V1_northOffset
-      LI7700:
-        modelName: LI7700
-        serialNumber: 2
-        dateIn: *V2_dateIn
-        sensorType: irga
-        northOffset: *V1_northOffset
-        xSeparation: -0.41
-        ySeparation: -0.16
-        verticalSeparation: 0
-      TC1:
-        modelName: TC
-        serialNumber: SSM
-        dateIN: *V1_dateIn
-        sensorType: biomet
-        northwardSeparation: -50
-        eastwardSeparation: -10 
-    rawDataFiles:
-      EC2024:
-        fileNameMatch: eddypro_t_full_output_2025-05-02T224906_exp.csv
-        measurementType: Flux
-        fileFormat: EddyProOutput
-        traces:
-          ch4_flux:
-            variableName: ch4_flux
-            units: 'umol m-2 s-1'
 
-  BSP:
-    siteID: BSP
-    lat_lon: [69.319431, -135.478286]
-extra: stuff
+siteID: SCL
+lat_lon: [69.2264167, -135.2519067]
+dataLoggers:
+  main:
+    dateIn: &V1_dateIn 2024-07-10T00:00:00
+    modelName: CR1000x
+    serialNumber: 1
+  winterMet:
+    dateIn: 2024-09-15
+    dateOut: 2025-06-19
+    modelName: CR10x
+    serialNumber: 1
+  aux1:
+    dateIn: *V1_dateIn
+    modelName: HOBO
+    serialNumber: 1
+  aux2:
+    dateIn: *V1_dateIn
+    modelName: HOBO
+    serialNumber: 2
+sensors:
+  CSAT3-UBC:
+    modelName: CSAT3
+    serialNumber: 1
+    dateIn: *V1_dateIn
+    dateOut: &V1_dateOut 2024-09-15T00:00:00
+    sensorType: sonic
+    Zm: &V1_Zm 3.285
+    northOffset: &V1_northOffset 33.0
+  LI7500-UBC:
+    modelName: LI7500
+    serialNumber: 1
+    dateIn: *V1_dateIn
+    dateOut: *V1_dateOut
+    sensorType: irga
+    northOffset: *V1_northOffset
+    xSeparation: 0.15
+    ySeparation: -0.06
+    verticalSeparation: 0
+  LI7700-UBC: 
+    modelName: LI7700
+    serialNumber: 1
+    dateIn: *V1_dateIn
+    dateOut: *V1_dateOut
+    sensorType: irga
+    northOffset: *V1_northOffset
+    xSeparation: 0.23
+    ySeparation: -0.14
+    verticalSeparation: 0
+  IRGASON:
+    modelName: IRGASON
+    serialNumber: 1
+    dateIn: &V2_dateIn 2025-08-01T00:00:00
+    sensorType: sonic-irga
+    Zm: *V1_Zm
+    northOffset: *V1_northOffset
+  LI7700:
+    modelName: LI7700
+    serialNumber: 2
+    dateIn: *V2_dateIn
+    sensorType: irga
+    northOffset: *V1_northOffset
+    xSeparation: -0.41
+    ySeparation: -0.16
+    verticalSeparation: 0
+  TC1:
+    modelName: TC
+    serialNumber: SSM
+    dateIN: *V1_dateIn
+    sensorType: biomet
+    northwardSeparation: -50
+    eastwardSeparation: -10 
+rawDataFiles:
+  EC2024:
+    fileNameMatch: eddypro_t_full_output_2025-05-02T224906_exp.csv
+    measurementType: Flux
+    fileFormat: EddyProOutput
+    traces:
+      ch4_flux:
+        variableName: ch4_flux
+        units: 'umol m-2 s-1'
+
+#   BSP:
+#     siteID: BSP
+#     lat_lon: [69.319431, -135.478286]
+# extra: stuff

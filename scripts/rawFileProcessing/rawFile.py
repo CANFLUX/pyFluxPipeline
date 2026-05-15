@@ -12,7 +12,7 @@ class rawFile(project):
     templateFile: str = None
     siteID: str
     fileID: str
-    mode: str = field(repr=False,metadata=mdMap('extract data or inspect header',options=['extractData','inspectHeader']))
+    mode: str = field(repr=False,default='inspectHeader',metadata=mdMap('extract data or inspect header',options=['extractData','inspectHeader']))
     fileFormat: str = field(metadata=mdMap('used to determine which file parser', options=['EddyProOutput','HOBOcsv','TOB3','TOA5']))
     traces: dict = field(default_factory=dict)
     traceConfiguration: str = field(default=None,repr=False)
@@ -43,8 +43,8 @@ class rawFile(project):
 
 
     def formatTable(self):
-        breakpoint()
-        # pass
+        # breakpoint()
+        pass
         # names = {val['originalVariable']:val['variableName'] for val in self.traces.values()}
         # self.rawDataTable=self.rawDataTable.rename(columns=names)
         # typeMap = {val['variableName']:val['dtype'] for val in self.traces.values() if val['variableName'] in self.rawDataTable.columns}
@@ -55,3 +55,9 @@ class rawFile(project):
 
         # self.rawDataTable.index.name='datetime'
         # self.rawDataTable.index=self.rawDataTable.index.tz_localize(self.timezone)
+
+# python -m scripts.rawFileProcessing.rawFile --fileName testing\data\eddypro_t_full_output_2025-05-02T224906_exp.csv --siteID SCL --projectPath testing/testProject --fileFormat EddyProOutput --fileID EP_recalc_2024 
+if __name__ == '__main__':
+    current = rawFile.from_cmd(safeMode=False)
+
+    breakpoint()

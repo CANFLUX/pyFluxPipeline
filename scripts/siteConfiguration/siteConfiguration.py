@@ -40,9 +40,9 @@ class site(project):
     def dataCheck(self):
         # Check data sources
         IDs = list(self.rawDataFiles.keys())
-        for id in IDs:
-            params = self.rawDataFiles.pop(id)
-            params = rawFileParameters.from_dict(params)
+        # for id in IDs:
+        #     params = self.rawDataFiles.pop(id)
+        #     params = rawFileParameters.from_dict(params)
             # params = sensor.from_dict(params)
             # self.sensors[params.hardwareID] = params#.to_dict()
     

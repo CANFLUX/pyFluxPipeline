@@ -1,14 +1,16 @@
-from scripts.database.databaseConfiguration import databaseConfiguration
+from helperFunctions.baseClass import baseClassMethods,baseDataClass,mdMap
 from helperFunctions.safeFormat import safeFormat,cleanString
-from helperFunctions.baseClass import baseDataClass,mdMap
 from pandas.api.types import is_numeric_dtype
 from dataclasses import dataclass,field
+import os
+
+defaultSettings = baseClassMethods().loadDict(os.path.join(os.getcwd(),'configurationFiles','defaultSettings.yml'))
 
 @dataclass(kw_only=True)
 class common(baseDataClass):
     variableName: str = field(default=None,metadata=mdMap('Name of the variable (must be filename safe, alphanumeric with underscores accepted)'))
     units: str = field(default='', metadata=mdMap(''))
-    dtype: str = field(default=databaseConfiguration.defaultDataType,metadata=mdMap('data type (float, string, etc.)'))
+    dtype: str = field(default=defaultSettings['defaultDataType'],metadata=mdMap('data type (float, string, etc.)'))
 
 @dataclass(kw_only=True)
 class rawTrace(common):

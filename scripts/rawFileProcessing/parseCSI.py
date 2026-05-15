@@ -15,19 +15,13 @@ import os
 
 @dataclass(kw_only=True)
 class csiTable(sharedFields):
-    # fileName: str
-    skipRows: int = field(default=0,init=False,repr=False)
-    headerRows: int = field(init=False)
-    # traces: dict = field(default_factory=dict)
     stationName: str = field(default=None,init=False,repr=False)
     loggerModel: str = field(default=None,init=False,repr=False)
     serialNumber: str = field(default=None,init=False,repr=False)
     program: str = field(default=None,init=False,repr=False)
-    byteMap: str = field(default=None)
-    mode: str = field(repr=False,metadata=mdMap('extract data or inspect header',options=['extractData','inspectHeader']))
     campbellBaseTime = 631152000.0      
             
-    def parseHeader(self,fileObject,fileFormat):
+    def parseHeader(self,fileObject):
         # Read header and parse common parameters between formats
         def readHeaderLine(line):
             if type(line) == str:
@@ -49,11 +43,10 @@ class csiTable(sharedFields):
                 self.logMessage(f"Total GPS induced offset in {self.fileName} is {Offset.iloc[-1]}s",verbose=False)
 class TOA5(csiTable):
 
-    def __post_init__(self):
-        super().__post_init__()
+    def readTOA5(self):
         self.headerRows = 4
         with open(self.fileName,'r') as fileObject:
-            self.parseHeader(fileObject,'TOA5')
+            self.parseHeader(fileObject)
             self.fileTimestamp = datetime.strptime(re.search(r'([0-9]{4}\_[0-9]{2}\_[0-9]{2}\_[0-9]{4})', self.fileName.rsplit('.',1)[0]).group(0),'%Y_%m_%d_%H%M')
             self.tableName = self.header[0][-1]
             defaultTypes = defaultdict(lambda: '<f4',RECORD ='<u4',TIMESTAMP = 'str')
@@ -67,19 +60,17 @@ class TOA5(csiTable):
         self.finishTable()
 
 class TOB3(csiTable):
-    headerSize = default=12
-    footerSize = default=4
-    indexColumns = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict(keepNull=False) for variable,unit,dtype in [
-                ('POSIX_Time','s','<i4'),('NANOSECONDS','ns','<i4'),('RECORD','','<u4')
-                ]}
 
-    def __post_init__(self):
-        super().__post_init__()
+    def readTOB3(self):
         self.headerRows = 6
-        self.fileFormat = type(self).__name__
+        self.headerSize = 12
+        self.footerSize = 4
+        self.indexColumns = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict(keepNull=False) for variable,unit,dtype in [
+                    ('POSIX_Time','s','<i4'),('NANOSECONDS','ns','<i4'),('RECORD','','<u4')
+                    ]}
         self.fileSize = os.path.getsize(self.fileName)
         with open(self.fileName,'rb') as fileObject:
-            self.parseHeader(fileObject,'TOB3')
+            self.parseHeader(fileObject)
             self.fileTimestamp = pd.to_datetime(self.header[0][-1])
             self.tableName = self.header[1][0]
             self.dataIntervalSeconds = pd.to_timedelta(parseFrequency(self.header[1][1])).total_seconds()

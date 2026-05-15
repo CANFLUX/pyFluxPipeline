@@ -1,16 +1,18 @@
 from scripts.siteConfiguration.hardware import dataLogger,sensor
 from scripts.siteConfiguration.rawData import rawFileParameters
 from scripts.projectParameters import project
-from helperFunctions import baseClass
 from dataclasses import dataclass, field
-mdMap = baseClass.mdMap
+from helperFunctions.baseClass import spatialObject,mdMap
+from datetime import datetime
 
 @dataclass(kw_only=True)
 class site(project):
     siteID: str = field(metadata = mdMap('Unique siteID code'))
+    startDate: datetime = field(default = None,metadata = mdMap('Start Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
+    stopDate: datetime = field(default = None,metadata = mdMap('Stop Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
     siteName: str = field(default = None,metadata = mdMap('Name of the Site'))
     sitePI: str = field(default = None,metadata=mdMap('Principal Investigator(s)'))
-    lat_lon: baseClass.spatialObject = field(default = None,metadata = mdMap('List of [Latitude, Longitude] coordinates in WGS1984 stored in decimal degrees.  Will parse coordinates if provided as strings in DMS or DDM format. For nested values, assumed to be same as parent object.  Optionally to provide if different from parent value.'))
+    lat_lon: spatialObject = field(default = None,metadata = mdMap('List of [Latitude, Longitude] coordinates in WGS1984 stored in decimal degrees.  Will parse coordinates if provided as strings in DMS or DDM format. For nested values, assumed to be same as parent object.  Optionally to provide if different from parent value.'))
     altitude: float = field(default = None,metadata = mdMap('Elevation (m.a.s.l).  For nested values, assumed to be same as parent object.  Optionally to provide if different from parent value.'))
     canopyHeight: float = field(default=None,metadata=mdMap('optional parameter to describe general vegetation height at site.  Can be overridden by dynamic values where appropriate'))
     siteDescription: str = field(default = None,metadata=mdMap('self explanatory'))

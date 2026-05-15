@@ -1,0 +1,8 @@
+pyyaml
+ruamel.yaml
+geopandas
+utm
+dateparser
+matplotlib
+statsmodels
+scikit-learn

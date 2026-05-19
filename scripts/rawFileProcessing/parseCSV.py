@@ -35,27 +35,28 @@ class csvFile(sharedFields):
         # parse the header to a list (only if not user provided, otherwise just skip)
         self.header = []
         for i in range(self.headerRows):
-            HL = cleanString(rawFile.readline(),repKey={'\n':''},passKey={'°','µ'})
+            HL = cleanString(rawFile.readline(),replace={'\n':''},permit={'°','µ'})
             subText ='THISISADELIMTERITDOESNTBELONGHERE'
             HL = delimSub(HL,subText)
             HL = [format(h) for h in HL.split(self.delimiter)]
             self.header.append(HL)
 
-        self.rawDataTable = pd.read_csv(rawFile,delimiter=self.delimiter,header=None,na_values=self.na_values)
+        self.dataTable = pd.read_csv(rawFile,delimiter=self.delimiter,header=None,na_values=self.na_values)
         rawFile.close()
-        self.rawDataTable = self.rawDataTable.dropna(how='all')
+        self.dataTable = self.dataTable.dropna(how='all')
         if self.labelColumnBy == 'name':
             names = self.header[0]
-            self.rawDataTable.columns = names
-        self.typeMap = self.rawDataTable.dtypes
+            self.dataTable.columns = names
+        self.typeMap = self.dataTable.dtypes
         self.typeMap[self.typeMap=='float64'] = 'float32'
-        self.rawDataTable = self.rawDataTable.astype(self.typeMap)
+        self.dataTable = self.dataTable.astype(self.typeMap)
         
 
 # @dataclass(kw_only=True)
 class EddyProOutput(csvFile):
 
     def readEddyProOutput(self):
+        self.dataIntervalSeconds = 1800.0
         self.skipRows = 1
         self.headerRows = 2
         self.labelColumnBy = 'name'
@@ -69,11 +70,11 @@ class EddyProOutput(csvFile):
             self.traces = {key:rawTrace.from_dict({'originalVariable':key,'units':value,'dtype':self.typeMap[key]}).to_dict() for i,(key,value) in enumerate(zip(self.header[0],self.header[1]))}
 
         TIMESTAMP = pd.to_datetime(
-            self.rawDataTable[self.timestampFormat.keys()].agg(' '.join,axis=1),
+            self.dataTable[self.timestampFormat.keys()].agg(' '.join,axis=1),
             format=' '.join([v for v in self.timestampFormat.values()])
             )
 
-        self.rawDataTable.index = TIMESTAMP 
+        self.dataTable.index = TIMESTAMP 
 
 # @dataclass(kw_only=True)
 class HOBOcsv(csvFile):
@@ -90,18 +91,18 @@ class HOBOcsv(csvFile):
             warnings.simplefilter("error", category=UserWarning)
             if self.timestampFormat is None:
                 try:
-                    TIMESTAMP = pd.to_datetime(self.rawDataTable[1])
+                    TIMESTAMP = pd.to_datetime(self.dataTable[1])
                 except:
                     self.logWarning('Bulk parsing of timestamp failed on first attempt, indicating suspicious format.  This is common in hobo files. Parsed assuming yearfirst=True. Double check results.  For better performance, explicitly provide timestamp format.')
-                    TIMESTAMP = pd.to_datetime(self.rawDataTable[1],format='mixed',yearfirst=True)
+                    TIMESTAMP = pd.to_datetime(self.dataTable[1],format='mixed',yearfirst=True)
             else:
                 
                 TIMESTAMP = pd.to_datetime(
-                    self.rawDataTable[self.timestampFormat.keys()].agg(' '.join,axis=1),
+                    self.dataTable[self.timestampFormat.keys()].agg(' '.join,axis=1),
                     format=' '.join([v for v in self.timestampFormat.values()])
                     )
                     
-        self.rawDataTable.index = TIMESTAMP 
-        ix = np.where(self.rawDataTable.values=='Logged')[0]
-        ix = self.rawDataTable.index[ix]
-        self.rawDataTable = self.rawDataTable.drop(ix)
+        self.dataTable.index = TIMESTAMP 
+        ix = np.where(self.dataTable.values=='Logged')[0]
+        ix = self.dataTable.index[ix]
+        self.dataTable = self.dataTable.drop(ix)

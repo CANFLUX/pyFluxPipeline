@@ -1,4 +1,3 @@
-
 siteID: SCL
 lat_lon: [69.2264167, -135.2519067]
 dataLoggers:
@@ -71,17 +70,17 @@ sensors:
     sensorType: biomet
     northwardSeparation: -50
     eastwardSeparation: -10 
-rawDataFiles:
-  EC2024:
-    fileNameMatch: eddypro_t_full_output_2025-05-02T224906_exp.csv
-    measurementType: Flux
-    fileFormat: EddyProOutput
-    traces:
-      ch4_flux:
-        variableName: ch4_flux
-        units: 'umol m-2 s-1'
+# dataSources:
+#   EC2024:
+#     fileNameMatch: eddypro_t_full_output_2025-05-02T224906_exp.csv
+#     measurementType: Flux
+#     fileFormat: EddyProOutput
+#     traces:
+#       ch4_flux:
+#         variableName: ch4_flux
+#         units: 'umol m-2 s-1'
 
-#   BSP:
-#     siteID: BSP
-#     lat_lon: [69.319431, -135.478286]
-# extra: stuff
+# BSP:
+#   siteID: BSP
+#   lat_lon: [69.319431, -135.478286]
+#   # extra: stuff

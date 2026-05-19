@@ -37,8 +37,8 @@ class csiTable(sharedFields):
     def finishTable(self):
         if hasattr(self,'gpsDriftCorrection') and self.gpsDriftCorrection:
             # Identify gaps in time series
-            Offset = (self.rawDataTable.index.diff().fillna(self.dataIntervalSeconds)-self.dataIntervalSeconds).cumsum()
-            self.rawDataTable.index -= Offset
+            Offset = (self.dataTable.index.diff().fillna(self.dataIntervalSeconds)-self.dataIntervalSeconds).cumsum()
+            self.dataTable.index -= Offset
             if self.verbose:
                 self.logMessage(f"Total GPS induced offset in {self.fileName} is {Offset.iloc[-1]}s",verbose=False)
 class TOA5(csiTable):
@@ -50,12 +50,12 @@ class TOA5(csiTable):
             self.fileTimestamp = datetime.strptime(re.search(r'([0-9]{4}\_[0-9]{2}\_[0-9]{2}\_[0-9]{4})', self.fileName.rsplit('.',1)[0]).group(0),'%Y_%m_%d_%H%M')
             self.tableName = self.header[0][-1]
             defaultTypes = defaultdict(lambda: '<f4',RECORD ='<u4',TIMESTAMP = 'str')
-            self.rawDataTable = pd.read_csv(fileObject,dtype=defaultTypes,names=self.header[1])
-        self.rawDataTable['TIMESTAMP'] = pd.to_datetime(self.rawDataTable['TIMESTAMP'],format='ISO8601')
-        self.dataIntervalSeconds = self.rawDataTable.TIMESTAMP.diff().median().total_seconds()
-        self.rawDataTable.index = self.rawDataTable['TIMESTAMP']
+            self.dataTable = pd.read_csv(fileObject,dtype=defaultTypes,names=self.header[1])
+        self.dataTable['TIMESTAMP'] = pd.to_datetime(self.dataTable['TIMESTAMP'],format='ISO8601')
+        self.dataIntervalSeconds = self.dataTable.TIMESTAMP.diff().median().total_seconds()
+        self.dataTable.index = self.dataTable['TIMESTAMP']
         if self.traces == {}:
-            typeMap = self.rawDataTable.dtypes
+            typeMap = self.dataTable.dtypes
             self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable]).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
         self.finishTable()
 
@@ -119,15 +119,15 @@ class TOB3(csiTable):
         # Process frame by frame
         frames = [f for i in range(self.nframes) for f in 
                 self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
-        rawDataTable = pd.DataFrame(frames,columns=list(self.indexColumns.keys())+list(self.traces.keys()))
+        dataTable = pd.DataFrame(frames,columns=list(self.indexColumns.keys())+list(self.traces.keys()))
         # Separate indices (parsed from headers) from traces
-        self.indexTraces = rawDataTable[list(self.indexColumns.keys())].astype(
+        self.indexTraces = dataTable[list(self.indexColumns.keys())].astype(
             {key:var['dtype'] for key,var in self.indexColumns.items()}
         )
-        self.rawDataTable = rawDataTable[list(self.traces.keys())].astype(
+        self.dataTable = dataTable[list(self.traces.keys())].astype(
             {key:var['dtype'] for key,var in self.traces.items()}
         )
-        self.rawDataTable.index=pd.to_datetime((self.indexTraces['POSIX_Time']*1e9).astype('int64')+self.indexTraces['NANOSECONDS'],unit='ns') 
+        self.dataTable.index=pd.to_datetime((self.indexTraces['POSIX_Time']*1e9).astype('int64')+self.indexTraces['NANOSECONDS'],unit='ns') 
         # breakpoint()
     
     def decodeFrame(self,frame):

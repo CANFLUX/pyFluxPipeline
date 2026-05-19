@@ -1,5 +1,6 @@
 from scripts.rawFileProcessing.rawFile import rawFile
-from scripts.openProject import openProject
+from scripts.rawFileProcessing.fileInventory import fileInventory
+from scripts.newProject import createProject
 import shutil
 import os
 
@@ -84,7 +85,48 @@ import os
 if __name__ == '__main__':
     if os.path.exists('testing/testProject'):
         shutil.rmtree('testing/testProject')
-    current = openProject.from_cmd(safeMode=False)
-    # current.loadSiteConfiguration()
-    print(current.defaultSettings)
+    current = createProject.from_cmd(safeMode=False)
     breakpoint()
+    # current.loadSiteConfiguration()
+    # print(current.defaultSettings)
+    # breakpoint()
+
+    # fileName = r"E:\data-dump\SCL\EddyPro\2024\eddypro_t_full_output_2025-05-02T224906_exp.csv"
+    # projectPath = 'testing/testProject'
+
+    # rf = rawFile(
+    #     fileName=fileName,
+    #     fileID='EP_recalc_2024',
+    #     siteID='SCL',
+    #     fileNameMatch='eddypro_t_full_output*.csv',
+    #     fileFormat='EddyProOutput',
+    #     projectPath=projectPath,
+    #     mode='identifyTraces'
+    #     )
+    # # breakpoint()
+    # fileInventory(
+    #     fileID='EP_recalc_2024',
+    #     siteID='SCL',
+    #     fileFormat='EddyProOutput',
+    #     projectPath=projectPath).fileSearch(r'E:\data-dump\SCL\2024')
+
+    
+    fileName = r"E:\data-dump\SCL\2024\20240912\Met_Data122.dat"
+    projectPath = 'testing/testProject'
+
+    rf = rawFile(
+        fileName=fileName,
+        fileID='EC_Met',
+        siteID='SCL',
+        fileNameMatch='Met_Data*.dat',
+        fileFormat='TOB3',
+        projectPath=projectPath,
+        mode='identifyTraces'
+        )
+    # breakpoint()
+    fileInventory(
+        fileID='EC_Met',
+        siteID='SCL',
+        fileFormat='TOB3',
+        projectPath=projectPath).fileSearch(r'E:\data-dump\SCL\2024')
+    

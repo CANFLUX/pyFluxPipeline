@@ -7,24 +7,34 @@ import os
 
 @dataclass(kw_only=True)
 class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
-    fileName: str = field(repr=False)
     templateFile: str = None
+    fileNameMatch: str = None
     siteID: str
     fileID: str
-    fileFormat: str = field(metadata=mdMap('used to determine which file parser', options=['EddyProOutput','HOBOcsv','TOB3','TOA5']))
     traces: dict = field(default_factory=dict)
+    searchDir: str = None
+    dateRange: list = None
+    fileInventory: dict = field(default_factory=dict,repr=False)
     configFileName: str = field(default=None,repr=False)
 
     def __post_init__(self):
+        super().__post_init__()
         configFileName = os.path.join(self.projectPath,'Sites',self.siteID,self.fileFormat,f'{self.fileID}.yml')
         if self.mode == 'extractData' and self.configFile is None:
             if not os.path.isfile(configFileName):
                 self.logError(f"does not exist: {configFileName}")
             params = self.loadDict(configFileName)
-            for key in self.__annotations__.keys():
-                if key in params:
+            for key in params:
+                if key in self.__dataclass_fields__.keys():
                     setattr(self,key,params[key])
-        super().__post_init__()
+        self.siteConfig = self.loadSiteConfiguration(self.siteID)
+        
+        if self.fileName is not None:
+            self.readFile()
+
+    def readFile(self,fileName=None):
+        if fileName is not None:
+            self.fileName = fileName
 
         if self.fileFormat == 'EddyProOutput':
             self.readEddyProOutput()
@@ -36,37 +46,51 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
             self.readTOA5()
         if self.mode == 'identifyTraces':
             self.templateFile = self.fileName
-            self.saveConfigFile(configFileName)
-    
-        breakpoint()
-        # method = eval(self.fileFormat)
-        # if self.mode == 'identifyTraces':
-        #     processed = method(fileName=self.fileName,traces=self.traces,mode=self.mode)
-        #     self.traces = processed.traces
-        #     if self.templateFile is None:
-        #         self.templateFile = self.fileName
-        #     self.saveDict(self.to_dict(),fileName=self.configFileName)
-        # else:
-        #     processed = method.from_yaml(self.configFileName,kwargs={'fileName':self.fileName,'mode':'extractData'})
-        #     self.rawDataTable = processed.rawDataTable
-        #     self.rawDataTable = self.rawDataTable.drop(columns=[key for key,value in self.traces.items() if value['ignore']])
-        #     self.rawDataTable = self.rawDataTable.dropna(how='all')
-        #     self.formatTable()
-
+            self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,self.fileFormat,f'{self.fileID}.yml'))
+            if self.dataIntervalSeconds is None:
+                self.logMessage(f'confirm dataIntervalSeconds inferred from table correctly: {self.dataIntervalSeconds}')
+                self.dataIntervalSeconds = self.dataTable.index.diff().median().total_seconds()
+            self.siteConfig.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,f"{self.siteID}_siteMetadata.yml"))
+            return None
+        elif self.dataTable.empty:
+            return None
+        else:
+            self.formatTable()
+            if self.fileFormat not in self.siteConfig.ini['rawData']:
+                self.siteConfig.ini['rawData'][self.fileFormat] = []
+            if self.dateRange is None:
+                self.dateRange = [self.dataTable.index.min().strftime('%Y-%m-%dT%H:%M:%S%z'),self.dataTable.index.max().strftime('%Y-%m-%dT%H:%M:%S%z')]
+            else:
+                self.dateRange = [
+                    min(self.dateRange[0],self.dataTable.posix_time.min()),
+                    max(self.dateRange[1],self.dataTable.posix_time.max())
+                ]
+            breakpoint()
+            self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,self.fileFormat,f'{self.fileID}.yml'))
+            self.siteConfig.ini['rawData'][self.fileFormat].append(self.fileID)
+            self.saveDict(self.siteConfig.ini,self.siteConfig.iniPath)
+            return (self.dataTable)
 
     def formatTable(self):
-        # breakpoint()
-        pass
-        # names = {val['originalVariable']:val['variableName'] for val in self.traces.values()}
-        # self.rawDataTable=self.rawDataTable.rename(columns=names)
-        # typeMap = {val['variableName']:val['dtype'] for val in self.traces.values() if val['variableName'] in self.rawDataTable.columns}
-                
-        # for c,d in typeMap.items():
-        #     if np.issubdtype(np.dtype(d),np.integer):
-        #         self.rawDataTable[c] = self.rawDataTable[c].fillna(-9999)
+        self.dataTable = self.dataTable.rename(columns = {key:value['variableName'] for key,value in self.traces.items()})
+        self.dataTable = self.dataTable.drop(columns=[value['variableName'] for value in self.traces.values() if value['ignore']])
+        self.dataTable = self.dataTable.dropna(how='all')
 
-        # self.rawDataTable.index.name='datetime'
-        # self.rawDataTable.index=self.rawDataTable.index.tz_localize(self.timezone)
+        if self.dataIntervalSeconds is None:
+            self.logError(f'Determine data interval or set to default for {self.fileFormat}')
+        self.dataTable = self.dataTable.resample(f"{self.dataIntervalSeconds}s").nearest()
+        if self.dataTable.index.unit=='us':
+            #Default in pandas >=3.0
+            posixtime_int64 = ((self.dataTable.index.astype(int)//1e6).values).astype('int64')
+        elif self.dataTable.index.unit == 'ns':
+            #Default in pandas <3.0
+            posixtime_int64 = ((self.dataTable.index.astype(int)//1e9).values).astype('int64')
+        self.dataTable[self.posixName] = posixtime_int64
+        self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)
+        
+
+        # self.dataTable.index.name='datetime'
+        # self.dataTable.index=self.dataTable.index.tz_localize(self.timezone)
 
 # python -m scripts.rawFileProcessing.rawFile --fileName testing\data\eddypro_t_full_output_2025-05-02T224906_exp.csv --siteID SCL --projectPath testing/testProject --fileFormat EddyProOutput --fileID EP_recalc_2024 
 # python -m scripts.rawFileProcessing.rawFile --fileName testing\data\Met_Data122.dat --siteID SCL --projectPath testing/testProject --fileFormat TOB3 --fileID EC_Met_2024 

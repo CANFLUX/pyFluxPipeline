@@ -20,6 +20,7 @@ class rawTrace(common):
     ignore: bool = False
 
     def __post_init__(self):
+        self.originalVariable = cleanString(self.originalVariable,replace={'*':'star'})
         if self.variableName is None:
             self.variableName = safeFormat(self.originalVariable)
         if not self.ignore:
@@ -27,5 +28,5 @@ class rawTrace(common):
                 self.ignore = True
             elif self.variableName == '_':
                 self.ignore = True
-        self.units = cleanString(self.units,passKey={'°','µ'})
+        self.units = cleanString(self.units,permit={'°','µ'})
         super().__post_init__()

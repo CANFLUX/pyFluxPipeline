@@ -60,7 +60,7 @@ class sensorPosition():
         if sensorType not in ['sonic','sonic-irga','irga']:
             return
         elif sensorType in ['sonic','sonic-irga']:
-            if 'Zm' is None:
+            if self.Zm is None:
                 self.logError('Specify measurement height')
             # for v in ['northwardSeparation', 'eastwardSeparation',  'verticalSeparation', 'xSeparation', 'ySeparation']:
             #     if getattr(self,v) is None:

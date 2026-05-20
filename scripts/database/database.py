@@ -79,9 +79,10 @@ class database(defaultSettings):
             data = {f.split('.')[0]:self.readTrace(os.path.join(traceFolder,f)) for f in os.listdir(traceFolder)}
         )
         dataTable = pd.concat([dataTable,pd.DataFrame(
+            index = dataTable.index,
             data = {column: (np.ones(dataTable.shape[0])*self.intMask).astype(dtype) if np.issubdtype(dtype,np.integer) else (np.ones(dataTable.shape[0])*np.nan).astype(dtype)
                     for column,dtype in expectedTraces.items() if column not in dataTable.columns
-                    })])
+                    })],axis=1)
         dataTable.index = pd.to_datetime(dataTable['posix_time'],unit='s').dt.tz_localize(self.timezone)
         return(dataTable)
     

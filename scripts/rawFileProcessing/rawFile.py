@@ -2,6 +2,7 @@ from scripts.rawFileProcessing.parseCSV import EddyProOutput, HOBOcsv
 from scripts.rawFileProcessing.parseCSI import TOB3, TOA5
 from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass, field
+import pandas as pd
 import numpy as np
 import os
 
@@ -11,9 +12,9 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
     fileNameMatch: str = None
     siteID: str
     fileID: str
-    traces: dict = field(default_factory=dict)
-    searchDir: str = None
     dateRange: list = None
+    traces: dict = field(default_factory=dict)
+    searchDir: str = field(default=None,repr=False)
     fileInventory: dict = field(default_factory=dict,repr=False)
     configFileName: str = field(default=None,repr=False)
 
@@ -46,6 +47,10 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
             self.readTOA5()
         if self.mode == 'identifyTraces':
             self.templateFile = self.fileName
+            # Update ignores (user provided or defaults from processor)
+            if self.ignore is not None:
+                for ignore in self.ignore:
+                    self.traces[ignore]['ignore'] = True
             self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,self.fileFormat,f'{self.fileID}.yml'))
             if self.dataIntervalSeconds is None:
                 self.logMessage(f'confirm dataIntervalSeconds inferred from table correctly: {self.dataIntervalSeconds}')
@@ -56,20 +61,8 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
             return None
         else:
             self.formatTable()
-            if self.fileFormat not in self.siteConfig.ini['rawData']:
-                self.siteConfig.ini['rawData'][self.fileFormat] = []
-            if self.dateRange is None:
-                self.dateRange = [self.dataTable.index.min().strftime('%Y-%m-%dT%H:%M:%S%z'),self.dataTable.index.max().strftime('%Y-%m-%dT%H:%M:%S%z')]
-            else:
-                self.dateRange = [
-                    min(self.dateRange[0],self.dataTable.posix_time.min()),
-                    max(self.dateRange[1],self.dataTable.posix_time.max())
-                ]
-            breakpoint()
-            self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,self.fileFormat,f'{self.fileID}.yml'))
-            self.siteConfig.ini['rawData'][self.fileFormat].append(self.fileID)
-            self.saveDict(self.siteConfig.ini,self.siteConfig.iniPath)
             return (self.dataTable)
+
 
     def formatTable(self):
         self.dataTable = self.dataTable.rename(columns = {key:value['variableName'] for key,value in self.traces.items()})
@@ -87,10 +80,16 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
             posixtime_int64 = ((self.dataTable.index.astype(int)//1e9).values).astype('int64')
         self.dataTable[self.posixName] = posixtime_int64
         self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)
-        
 
-        # self.dataTable.index.name='datetime'
-        # self.dataTable.index=self.dataTable.index.tz_localize(self.timezone)
+        if self.dateRange is None:
+            self.dateRange = [self.dataTable.index.min().isoformat(),self.dataTable.index.max().isoformat()]
+        else:
+            self.dateRange = pd.to_datetime(self.dateRange)
+            self.dateRange = [
+                min(self.dateRange[0],self.dataTable.index.min()).isoformat(),
+                max(self.dateRange[1],self.dataTable.index.max()).isoformat()
+            ]
+        
 
 # python -m scripts.rawFileProcessing.rawFile --fileName testing\data\eddypro_t_full_output_2025-05-02T224906_exp.csv --siteID SCL --projectPath testing/testProject --fileFormat EddyProOutput --fileID EP_recalc_2024 
 # python -m scripts.rawFileProcessing.rawFile --fileName testing\data\Met_Data122.dat --siteID SCL --projectPath testing/testProject --fileFormat TOB3 --fileID EC_Met_2024 

@@ -16,6 +16,7 @@ class sharedFields(database):
     traces: dict = field(default_factory=dict)
     fileFormat: str = field(metadata=mdMap('used to determine which file parser', options=['EddyProOutput','HOBOcsv','TOB3','TOA5']))
     mode: str = field(default='identifyTraces',repr=False,metadata=mdMap('extract data or inspect header',options=['extractData','identifyTraces']))
+    ignore: list = None
     
 
     def __post_init__(self):

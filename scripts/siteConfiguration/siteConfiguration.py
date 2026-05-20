@@ -18,8 +18,8 @@ class configMetadata:
 @dataclass(kw_only=True)
 class configTemplate:
     Metadata: dict = None
-    Processing: dict = field(default_factory=lambda:{'FirstStage':{},'SecondStage':{},'ThirdStage':{}})
     rawData: dict = field(default_factory=dict)
+    Processing: dict = field(default_factory=lambda:{'FirstStage':{},'SecondStage':{},'ThirdStage':{}})
     def __post_init__(self):
         # if isinstance(self.Metadata,str):
         self.Metadata = configMetadata(**self.Metadata).__dict__

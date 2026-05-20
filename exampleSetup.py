@@ -1,5 +1,7 @@
-from scripts.rawFileProcessing.rawFile import rawFile
+
 from scripts.rawFileProcessing.fileInventory import fileInventory
+from scripts.rawFileProcessing.rawFile import rawFile
+from scripts.traceAnalysis.firstStage import firstStage
 from scripts.newProject import createProject
 import shutil
 import os
@@ -42,23 +44,19 @@ Flux2024 = rawFile(
     )
 print('Edit: ',os.path.join(Met2024.projectPath,'Sites',Met2024.siteID,Met2024.fileFormat,f'{Met2024.fileID}.yml'))
 print('Edit: ',os.path.join(Flux2024.projectPath,'Sites',Flux2024.siteID,Flux2024.fileFormat,f'{Flux2024.fileID}.yml'))
-breakpoint()
+# breakpoint()
 fileInventory(
     fileID=Met2024.fileID,
     siteID=Met2024.siteID,
     fileFormat=Met2024.fileFormat,
     projectPath=projectPath).fileSearch(root + r'\2024')
-# fileInventory(
-#     fileID=Met2024.fileID,
-#     siteID=Met2024.siteID,
-#     fileFormat=Met2024.fileFormat,
-#     projectPath=projectPath).fileSearch(root + r'\2024\20240912')
-
 fileInventory(
     fileID=Flux2024.fileID,
     siteID=Flux2024.siteID,
     fileFormat=Flux2024.fileFormat,
     projectPath=projectPath).fileSearch(root + r'\2024')
+
+firstStage(projectPath=projectPath,sites='SCL',years=2024)
 
 # # breakpoint()
 # fileInventory(

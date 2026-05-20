@@ -63,7 +63,6 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
             self.formatTable()
             return (self.dataTable)
 
-
     def formatTable(self):
         self.dataTable = self.dataTable.rename(columns = {key:value['variableName'] for key,value in self.traces.items()})
         self.dataTable = self.dataTable.drop(columns=[value['variableName'] for value in self.traces.values() if value['ignore']])

@@ -15,7 +15,7 @@ class fileInventory(rawFile):
     fileInventory: dict = field(default_factory=dict,repr=False)
 
     def __post_init__(self):
-        self.fileInventoryPath = os.path.join(self.projectPath,'Sites',self.siteID,self.fileFormat,f'{self.fileID}_inventory.json')
+        self.fileInventoryPath = os.path.join(self.projectPath,'Sites',self.siteID,'rawFiles',f'{self.fileID}_inventory.json')
         if os.path.isfile(self.fileInventoryPath):
             self.fileInventory = self.loadDict(self.fileInventoryPath)
         super().__post_init__()
@@ -43,7 +43,8 @@ class fileInventory(rawFile):
                 self.uploadRawData(
                     newData = pd.concat([self.readFile(os.path.join(sourceDir,f[0],f[1])) for f in fname]),
                     siteID = self.siteID,
-                    stageID = self.fileID
+                    stageID = self.fileID,
+                    interval = self.dataIntervalSeconds
                     )
                 dtNow = datetime.now().strftime('%Y-%m-%dT%H:%M:%S%z')
                 for subDir,fileName in fname:
@@ -59,14 +60,14 @@ class fileInventory(rawFile):
     def formatIni(self):
         raw = self.siteConfig.ini['rawData']
         first = self.siteConfig.ini['Processing']['FirstStage']
-        if self.fileFormat not in raw:
-            raw[self.fileFormat] = {}
+        if self.fileID not in raw:
+            raw[self.fileID] = {}
         inputDates = CommentedSeq(self.dateRange)
         inputDates.yaml_set_anchor(f'{self.fileID}_inputDatess')
-        raw[self.fileFormat][self.fileID] = inputDates
+        raw[self.fileID] = inputDates
         for value in self.traces.values():
             if not value['ignore']:
-                inputFile = os.path.join(self.fileFormat,self.fileID,value['variableName'])
+                inputFile = f"{self.fileID}.{value['variableName']}"
                 key = value['variableName']
                 if key not in first:
                     first[key] = firstStageTrace.from_dict(value|{'inputFiles':inputFile,'inputDates':inputDates}).to_dict()
@@ -82,6 +83,6 @@ class fileInventory(rawFile):
                 else:
                     first[key]['inputFiles'][inputFile] = inputDates
 
-        self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,self.fileFormat,f'{self.fileID}.yml'))
+        self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,'rawFiles',f'{self.fileID}.yml'))
         self.saveDict(self.siteConfig.ini,self.siteConfig.iniPath)
         

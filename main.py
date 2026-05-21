@@ -4,6 +4,14 @@ from scripts.newProject import createProject
 import shutil
 import os
 
+import pandas as pd
+import numpy as np
+
+
+ts = np.fromfile(r'C:\Users\jskeeter\gsc-permafrost\pyFluxPipeline\testing\testProject\Database\2024\SCL\raw\SSM_TS\posix_time.int64',dtype='int64')
+ts = pd.to_datetime(ts,unit='s')
+breakpoint()
+
 
 # fileName = r"E:\data-dump\SCL\EddyPro\2024\eddypro_t_full_output_2025-05-02T224906_exp.csv"
 # projectPath = 'testing/testProject'

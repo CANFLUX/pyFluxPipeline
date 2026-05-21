@@ -1,8 +1,9 @@
 siteID: SCL
 lat_lon: [69.2264167, -135.2519067]
+startDate: &V1_dateIn 2024-07-10T00:00:00
 dataLoggers:
   main:
-    dateIn: &V1_dateIn 2024-07-10T00:00:00
+    dateIn: *V1_dateIn
     modelName: CR1000x
     serialNumber: 1
   winterMet:

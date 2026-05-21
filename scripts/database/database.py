@@ -7,29 +7,20 @@ import pandas as pd
 import numpy as np
 import os
 
-currentYear = datetime.now().year
-posixYears = pd.date_range('1970-01-01T00:30',f"{currentYear+2}-01-01T00:00",freq='YS')
-if posixYears.unit=='us':
-    #Default in pandas >=3.0
-    posixYears = ((posixYears.astype(int)//1e6).values).astype('int64')
-elif posixYears.unit == 'ns':
-    #Default in pandas <3.0
-    posixYears = ((posixYears.astype(int)//1e9).values).astype('int64')
-else:
-    exit(f'add process for {posixYears.unit}')
-posixYears = pd.Series({timestamp:i+1970 for i,timestamp in enumerate(posixYears)},name='Year')
+
 
 @dataclass
 class defaultSettings(project):
     dataIntervalSeconds: float = 1800.0 # Defaults to 1800s (30 min) for the database, however any format is acceptable for a given database folder
     timezone: str = 'UTC' # defaults to UTC for simplicity, but can be set to any timezone on a site or data-source specific basis
-
-    posixYears = posixYears
+    # posixYears = posixYears
     intMask = -9999 # NO DATA value for integer data
     defaultDataType = 'float32' # Any numeric type acceptable, float32 & int32 preferred for optimizing precisions vs. storage requirements
     posixName = 'posix_time' # Filename of python time-trace (stored in posix format with int64 dtype)
     datenumName = 'clean_tv' # Legacy variable to allow interoperability of generated database with Biomet.net
     
+    currentYear = datetime.now().year
+
 @dataclass(kw_only=True)
 class database(defaultSettings):
 
@@ -43,22 +34,22 @@ class database(defaultSettings):
         if self.sites == []:
             self.sites = [pth for pth in os.listdir(os.path.join(self.projectPath,'Sites'))]
         
+    def posixYears(self,interval):
+        # Get the first timestamp of first record in every possible database year 
+        # start of epoch (1970) to two years past current
+        timestamp = pd.date_range('1970-01-01T00:00',f"{self.currentYear+2}-01-01T00:00",freq='YS')+pd.to_timedelta(interval,unit='s') 
+        if timestamp.unit=='us':
+            #Default in pandas >=3.0
+            timestamp = ((timestamp.astype(int)//1e6).values).astype('int64')
+        elif timestamp.unit == 'ns':
+            #Default in pandas <3.0
+            timestamp = ((timestamp.astype(int)//1e9).values).astype('int64')
+        else:
+            exit(f'add process for {timestamp.unit}')
+        return(pd.Series({ts:i+1970 for i,ts in enumerate(timestamp)},name='Year'))
 
-    def loadSiteConfiguration(self,siteID,template=False):
-        # Create an empty template
-        # if template:
-        #     self.logMessage(f"Creating empty template for {siteID}")
-        #     return(siteConfiguration(siteID=siteID,projectPath=self.projectPath,template=True))
-        # # read a user-provided file
-        # if os.path.isfile(siteID):
-        #     return(
-        #         siteConfiguration.from_yaml(
-        #             siteID,
-        #             kwargs={'projectPath':self.projectPath}
-        #             )
-        #         )
-        # # read a project file
-        # else:
+
+    def loadSiteConfiguration(self,siteID):
         return(
             siteConfiguration.from_yaml(
                 os.path.join(self.projectPath,'Sites',siteID,f"{siteID}_siteMetadata.yml"),
@@ -73,42 +64,60 @@ class database(defaultSettings):
 
     def readTrace(self,filePath):
         return(np.fromfile(filePath,dtype=filePath.split('.')[-1]))
+    
+    def noDataTable(self,index,typeMap):
+        empty = pd.DataFrame(index = index,
+            data = {
+                column: (np.ones(index.shape[0])*self.intMask).astype(dtype) if np.issubdtype(dtype,np.integer)
+                else (np.ones(index.shape[0])*np.nan).astype(dtype)
+                for column,dtype in typeMap.items()
+            })
+        return(empty)
 
     def loadTraceFolder(self,traceFolder,expectedTraces={}):
-        dataTable = pd.DataFrame(
-            data = {f.split('.')[0]:self.readTrace(os.path.join(traceFolder,f)) for f in os.listdir(traceFolder)}
-        )
-        dataTable = pd.concat([dataTable,pd.DataFrame(
-            index = dataTable.index,
-            data = {column: (np.ones(dataTable.shape[0])*self.intMask).astype(dtype) if np.issubdtype(dtype,np.integer) else (np.ones(dataTable.shape[0])*np.nan).astype(dtype)
-                    for column,dtype in expectedTraces.items() if column not in dataTable.columns
-                    })],axis=1)
-        dataTable.index = pd.to_datetime(dataTable['posix_time'],unit='s').dt.tz_localize(self.timezone)
-        return(dataTable)
-    
-    def writeTraceFolder(self,newData,siteID,stageID):
-        start = self.posixYears[self.posixYears.index<=newData[self.posixName].min()].max()
-        stop = self.posixYears[self.posixYears.index>newData[self.posixName].max()].min()
-        for startTime,year in self.posixYears[(self.posixYears>=start) * (self.posixYears<stop)].to_dict().items():
-            stopTime = self.posixYears[self.posixYears==year+1].index[0]
+        try:
+            dataTable = pd.DataFrame(
+                data = {f.split('.')[0]:self.readTrace(os.path.join(traceFolder,f)) for f in os.listdir(traceFolder)}
+            )
+            expectedTraces = {key:value for key,value in expectedTraces.items() if key not in dataTable.columns}
+            if len(expectedTraces):
+                dataTable = pd.concat([dataTable,self.noDataTable(dataTable.index,expectedTraces)],axis=1)
+            dataTable.index = pd.to_datetime(dataTable['posix_time'],unit='s').dt.tz_localize(self.timezone)
+            return(dataTable)
+        except:
+            breakpoint()
+        
+    def writeTraceFolder(self,newData,siteID,stageID,interval):
+        # Output by year, all contents within the dataframe
+        if interval is None:
+            interval = self.dataIntervalSeconds
+        posixYearIndex= self.posixYears(interval)
+        start = posixYearIndex[posixYearIndex.index<=newData[self.posixName].min()].max()
+        stop = posixYearIndex[posixYearIndex.index>newData[self.posixName].max()].min()
+        for startTime,year in posixYearIndex[(posixYearIndex>=start) * (posixYearIndex<stop)].to_dict().items():
+            stopTime = posixYearIndex[posixYearIndex==year+1].index[0]
             traceFolder = os.path.join(self.databasePath,str(year),siteID,stageID)
             if not os.path.exists(traceFolder):
                 os.makedirs(traceFolder)
             for traceName in newData.columns:
                 self.writeTrace(
-                    trace=newData.loc[((newData.posix_time>=startTime)&(newData.posix_time<=stopTime)),traceName].values,
+                    trace=newData.loc[((newData.posix_time>=startTime)&(newData.posix_time<stopTime)),traceName].values,
                     filePath=os.path.join(traceFolder,traceName)
                 )
 
     def uploadRawData(self,newData,siteID,stageID,interval=None):
+        # remove duplicated rows
+        if newData.index.duplicated().sum()>0:
+            newData =  newData.loc[~newData.index.duplicated()].copy()
         stageID = os.path.join('raw',stageID)
         if interval is None:
             interval = self.dataIntervalSeconds
-        start = self.posixYears[self.posixYears.index<=newData[self.posixName].min()].max()
-        stop = self.posixYears[self.posixYears.index>newData[self.posixName].max()].min()
+        posixYearIndex = self.posixYears(interval)
+        start = posixYearIndex[posixYearIndex.index<=newData[self.posixName].min()].max()
+        stop = posixYearIndex[posixYearIndex.index>newData[self.posixName].max()].min()
         dataTable = []
-        for startTime,year in self.posixYears[(self.posixYears>=start) * (self.posixYears<stop)].to_dict().items():
-            stopTime = self.posixYears[self.posixYears==year+1].index[0]
+        for startTime,year in posixYearIndex[(posixYearIndex>=start) * (posixYearIndex<stop)].to_dict().items():
+            stopTime = posixYearIndex[posixYearIndex==year+1].index[0]
             traceFolder = os.path.join(self.databasePath,str(year),siteID,stageID)
             if not os.path.exists(traceFolder):
                 os.makedirs(traceFolder)
@@ -117,4 +126,4 @@ class database(defaultSettings):
             dataTable.append(self.loadTraceFolder(traceFolder,expectedTraces=newData.dtypes.to_dict()))
         dataTable = pd.concat(dataTable)
         dataTable.loc[newData.index] = newData.copy()
-        self.writeTraceFolder(dataTable,siteID,stageID)
+        self.writeTraceFolder(dataTable,siteID,stageID,interval)

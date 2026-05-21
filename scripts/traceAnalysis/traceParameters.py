@@ -26,7 +26,7 @@ class sharedMethods(baseDataClass):
 class rawTrace(sharedMethods):
     variableName: str = field(default=None,metadata=mdMap('Name of the variable (must be filename safe, alphanumeric with underscores accepted)'))
     units: str = field(default='', metadata=mdMap(''))
-    dtype: str = field(default=defaultSettings['defaultDataType'],metadata=mdMap('data type (float, string, etc.)'))
+    dtype: str = field(default=defaultSettings['defaultDataType'],metadata=mdMap('data type (float32, int64, etc.)'))
     originalVariable: str
     sensorID: str = None
     ignore: bool = False
@@ -47,6 +47,7 @@ class rawTrace(sharedMethods):
 class firstStageTrace(sharedMethods):
     variableName: str = field(default=None,metadata=mdMap('Name of the variable (must be filename safe, alphanumeric with underscores accepted)'))
     units: str = field(default='', metadata=mdMap(''))
+    dtype: str = field(default=defaultSettings['defaultDataType'],metadata=mdMap('data type (float32, int64, etc.)'))
     inputFiles: dict = None
     inputDates: list = field(default_factory=list,metadata=mdMap('date rang corresponding to input files (s)'),repr=False)
     dependent: list = field(default_factory=list,metadata=mdMap('Other variables upon which this trace will be filtered for nan'))

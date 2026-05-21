@@ -84,6 +84,17 @@ class TOB3(csiTable):
             dtypes = self.translateTypes(self.header[5])
             if self.traces == {}:
                 self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
+                self.tracesIn = list(self.traces.keys())
+            else:
+                # Check of mismatches
+                # Less than defined is fine, extra undefined will cause problems
+                tracesIn = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
+                if tracesIn.keys()!=self.traces.keys():
+                    tIn = tracesIn.keys()
+                    tEx = self.traces.keys()
+                    if len([t for t in tIn if t not in tEx]):
+                        self.logError(f"Unexpected traces in {self.fileName}:\n{[t for t in tIn if t not in tEx]} are not defined in configuration file")
+                self.tracesIn = list(tracesIn.keys())
             if self.mode == 'extractData':
                 self.readFrames(fileObject.read())
 
@@ -102,7 +113,7 @@ class TOB3(csiTable):
             if value in csiTypeMap:
                 self.byteMap.append(csiTypeMap[value]['struct'])
                 pyTypes.append(csiTypeMap[value]['output'])
-            elif type(value) is str and self.dtype.startswith('ASCII'):
+            elif type(value) is str and value.startswith('ASCII'):
                 self.byteMap.append(value.strip('ASCII()') + csiTypeMap['ASCII']['struct'])
                 pyTypes.append(csiTypeMap['ASCII']['output'])
         self.byteMap = ''.join(self.byteMap)
@@ -116,19 +127,28 @@ class TOB3(csiTable):
         self.byteMap_Body = '>'+''.join([self.byteMap for r in range(self.recordsPerFrame)])
         # Extract the binary data
         
+        tracesIn = {key:self.traces[key] for key in self.tracesIn}
+
         # Process frame by frame
         frames = [f for i in range(self.nframes) for f in 
                 self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
-        dataTable = pd.DataFrame(frames,columns=list(self.indexColumns.keys())+list(self.traces.keys()))
+        dataTable = pd.DataFrame(frames,columns=list(self.indexColumns.keys())+list(tracesIn.keys()))
         # Separate indices (parsed from headers) from traces
         self.indexTraces = dataTable[list(self.indexColumns.keys())].astype(
             {key:var['dtype'] for key,var in self.indexColumns.items()}
         )
-        self.dataTable = dataTable[list(self.traces.keys())].astype(
-            {key:var['dtype'] for key,var in self.traces.items()}
+        if self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated().sum():
+            self.logWarning(f'Duplicated timestamps found in {self.fileName} at\n{self.indexTraces[self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)]}\n Replicated indices will be offset by 1ns*(counter) to avoid conflicts')
+            ix = self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated()
+            rix = self.indexTraces.loc[ix,'RECORD'].astype('int32')
+            self.indexTraces.loc[ix,'NANOSECONDS'] += (rix-(rix.min()+1))
+            if self.dataIntervalSeconds<1:
+                self.logError('develop better approach?')
+
+        self.dataTable = dataTable[list(tracesIn.keys())].astype(
+            {key:var['dtype'] for key,var in tracesIn.items()}
         )
         self.dataTable.index=pd.to_datetime((self.indexTraces['POSIX_Time']*1e9).astype('int64')+self.indexTraces['NANOSECONDS'],unit='ns') 
-        # breakpoint()
     
     def decodeFrame(self,frame):
         frame = [struct.unpack('iii', frame[:self.headerSize]),

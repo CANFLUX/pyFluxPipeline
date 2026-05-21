@@ -12,7 +12,7 @@ if os.path.exists(projectPath):
 
 createProject(projectPath=projectPath,sites=[
     'configurationFiles/SCL_template.yml', # Template from preexisting metadata file for SCL
-    {'siteID': 'BSP','lat_lon': [69.319431, -135.478286]}, # Template from dict for BSP
+    {'siteID': 'BSP','lat_lon': [69.319431, -135.478286],'startDate':'2026-06-01'}, # Template from dict for BSP
     'FIL' # Generic template for site FIL
     ])
 
@@ -40,10 +40,34 @@ Flux2024 = rawFile(
     fileFormat='EddyProOutput',
     projectPath=projectPath,
     mode='identifyTraces',
-    ignore=['x_peak','x_offset','x_10%','x_30%','x_50%','x_70%','x_90%']
+    ignore=['DOY','daytime','x_peak','x_offset','x_10%','x_30%','x_50%','x_70%','x_90%']
     )
-print('Edit: ',os.path.join(Met2024.projectPath,'Sites',Met2024.siteID,Met2024.fileFormat,f'{Met2024.fileID}.yml'))
-print('Edit: ',os.path.join(Flux2024.projectPath,'Sites',Flux2024.siteID,Flux2024.fileFormat,f'{Flux2024.fileID}.yml'))
+
+Flux2025 = rawFile(
+    fileName=root +'/2025/20250806/57840_Flux_CSFormat_19.dat',
+    fileID='Flux2025',
+    siteID='SCL',
+    fileNameMatch='57840_Flux_CSFormat_*.dat',
+    fileFormat='TOB3',
+    projectPath=projectPath,
+    mode='identifyTraces',
+    ignore=['FETCH_MAX','FETCH_90','FETCH_80','FETCH_70','FETCH_FILTER','FETCH_INTRST','FP_FETCH_INTRST','FP_FETCH_INTRST','FP_EQUATION','daytime']
+)
+
+
+# inspect the traces in raw files
+SSM = rawFile(
+    fileName=root + r"\2024\20240914\20750528-SHSC.SSM.SGT.240720_240913readout.csv",
+    fileID='SSM_TS',
+    siteID='SCL',
+    fileNameMatch='20750528-SHSC.SSM.SGT*.csv',
+    fileFormat='HOBOcsv',
+    projectPath=projectPath,
+    mode='identifyTraces',
+    dataIntervalSeconds=3600.0 # set to were temporarily set to half-hourly, can just drop those data
+    )
+print('Edit: ',os.path.join(Met2024.projectPath,'Sites',Met2024.siteID,'rawFiles',f'{Met2024.fileID}.yml'))
+print('Edit: ',os.path.join(Flux2024.projectPath,'Sites',Flux2024.siteID,F'rawFiles',f'{Flux2024.fileID}.yml'))
 # breakpoint()
 fileInventory(
     fileID=Met2024.fileID,
@@ -55,8 +79,23 @@ fileInventory(
     siteID=Flux2024.siteID,
     fileFormat=Flux2024.fileFormat,
     projectPath=projectPath).fileSearch(root + r'\2024')
+fileInventory(
+    fileID=Flux2025.fileID,
+    siteID=Flux2025.siteID,
+    fileFormat=Flux2025.fileFormat,
+    projectPath=projectPath).fileSearch(root + r'\2025')
+fileInventory(
+    fileID=Flux2025.fileID,
+    siteID=Flux2025.siteID,
+    fileFormat=Flux2025.fileFormat,
+    projectPath=projectPath).fileSearch(root + r'\2026')
+fileInventory(
+    fileID=SSM.fileID,
+    siteID=SSM.siteID,
+    fileFormat=SSM.fileFormat,
+    projectPath=projectPath).fileSearch(root)
 
-firstStage(projectPath=projectPath,sites='SCL',years=2024)
+# firstStage(projectPath=projectPath,sites='SCL',years=[2024,2025])
 
 # # breakpoint()
 # fileInventory(

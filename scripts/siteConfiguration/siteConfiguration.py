@@ -27,7 +27,7 @@ class configTemplate:
 @dataclass(kw_only=True)
 class siteConfiguration(project):
     siteID: str = field(metadata = mdMap('Unique siteID code'))
-    startDate: datetime = field(default = None,metadata = mdMap('Start Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
+    startDate: datetime = field(metadata = mdMap('Start Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
     stopDate: datetime = field(default = None,metadata = mdMap('Stop Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
     siteName: str = field(default = None,metadata = mdMap('Name of the Site'))
     sitePI: str = field(default = None,metadata=mdMap('Principal Investigator(s)'))

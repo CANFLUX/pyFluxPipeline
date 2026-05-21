@@ -39,7 +39,7 @@ class createProject(database):
                 temp = siteConfiguration.from_yaml(siteID,kwargs={'projectPath':self.projectPath})
                 siteID = temp.siteID
             elif siteID.isalnum():
-                temp = siteConfiguration(siteID=siteID,projectPath=self.projectPath,template=True)
+                temp = siteConfiguration(siteID=siteID,projectPath=self.projectPath,template=True,startDate=f"{self.currentYear}-01-01 00:00:00+00:00")
                 siteID = temp.siteID
             else:
                 self.logError(f"Invalid siteID: {siteID}")

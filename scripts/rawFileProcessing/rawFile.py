@@ -20,7 +20,7 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
 
     def __post_init__(self):
         super().__post_init__()
-        configFileName = os.path.join(self.projectPath,'Sites',self.siteID,self.fileFormat,f'{self.fileID}.yml')
+        configFileName = os.path.join(self.projectPath,'Sites',self.siteID,'rawFiles',f'{self.fileID}.yml')
         if self.mode == 'extractData' and self.configFile is None:
             if not os.path.isfile(configFileName):
                 self.logError(f"does not exist: {configFileName}")
@@ -51,7 +51,7 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
             if self.ignore is not None:
                 for ignore in self.ignore:
                     self.traces[ignore]['ignore'] = True
-            self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,self.fileFormat,f'{self.fileID}.yml'))
+            self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,'rawFiles',f'{self.fileID}.yml'))
             if self.dataIntervalSeconds is None:
                 self.logMessage(f'confirm dataIntervalSeconds inferred from table correctly: {self.dataIntervalSeconds}')
                 self.dataIntervalSeconds = self.dataTable.index.diff().median().total_seconds()
@@ -64,12 +64,29 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
             return (self.dataTable)
 
     def formatTable(self):
+        
+        # Any expected traces missing from the input file, generated as missing data
+        missingTraces = {key:value['dtype'] for key,value in self.traces.items() if key not in self.dataTable.columns}
+        if len(missingTraces):
+            self.logWarning(f'Missing expected traces in {self.fileName}, filling with nodata')
+            missingTraces = self.noDataTable(self.dataTable.index,missingTraces)
+            self.dataTable = pd.concat([self.dataTable,missingTraces],axis=1)
+
+        # Drop extra columns not included in traces definition
+        self.dataTable = self.dataTable.drop(columns = self.dataTable.columns[~self.dataTable.columns.isin(list(self.traces.keys()))])
+        # rename columns according to traces
         self.dataTable = self.dataTable.rename(columns = {key:value['variableName'] for key,value in self.traces.items()})
-        self.dataTable = self.dataTable.drop(columns=[value['variableName'] for value in self.traces.values() if value['ignore']])
+        # drop ignore columns
+        self.dataTable = self.dataTable.drop(columns=[value['variableName'] for value in self.traces.values() if value['ignore'] if value['variableName'] in self.dataTable.columns])
+        # drop nan rows
         self.dataTable = self.dataTable.dropna(how='all')
 
         if self.dataIntervalSeconds is None:
             self.logError(f'Determine data interval or set to default for {self.fileFormat}')
+        # drop duplicated indexes (first considered valid)
+        if self.dataTable.index.duplicated().sum():
+            self.logWarning(f"Duplicated indices at in position:\n{self.dataTable[self.dataTable.index.duplicated(keep=False)]}")
+            self.dataTable = self.dataTable[~self.dataTable.index.duplicated()].copy()
         self.dataTable = self.dataTable.resample(f"{self.dataIntervalSeconds}s").nearest()
         if self.dataTable.index.unit=='us':
             #Default in pandas >=3.0
@@ -88,7 +105,6 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv):
                 min(self.dateRange[0],self.dataTable.index.min()).isoformat(),
                 max(self.dateRange[1],self.dataTable.index.max()).isoformat()
             ]
-        
 
 # python -m scripts.rawFileProcessing.rawFile --fileName testing\data\eddypro_t_full_output_2025-05-02T224906_exp.csv --siteID SCL --projectPath testing/testProject --fileFormat EddyProOutput --fileID EP_recalc_2024 
 # python -m scripts.rawFileProcessing.rawFile --fileName testing\data\Met_Data122.dat --siteID SCL --projectPath testing/testProject --fileFormat TOB3 --fileID EC_Met_2024 

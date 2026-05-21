@@ -85,8 +85,10 @@ class HOBOcsv(csvFile):
         self.labelColumnBy = 'index'
         self.open_csv_file()
         if self.traces == {}:
-            self.traces = {i:rawTrace.from_dict({'originalVariable':key,'dtype':self.typeMap[i]}).to_dict() for i,key in enumerate(self.header[0])}
-
+            self.traces = {i:rawTrace.from_dict({'originalVariable':key.replace('#','record_number'),'dtype':self.typeMap[i]}).to_dict() for i,key in enumerate(self.header[0])}
+        # ignore record
+        self.traces[0]['ignore'] = True
+        self.traces[0]['dtype'] = 'int32'
         with warnings.catch_warnings():
             warnings.simplefilter("error", category=UserWarning)
             if self.timestampFormat is None:
@@ -106,3 +108,6 @@ class HOBOcsv(csvFile):
         ix = np.where(self.dataTable.values=='Logged')[0]
         ix = self.dataTable.index[ix]
         self.dataTable = self.dataTable.drop(ix)
+        if self.dataIntervalSeconds is None:
+            self.dataIntervalSeconds = self.dataTable.index.diff().median().total_seconds()
+        # self.dataTable = self.dataTable.resample(f'{self.dataIntervalSeconds}s').asfreq()

@@ -2,6 +2,7 @@ from helperFunctions.baseClass import baseDataClass,mdMap
 from helperFunctions.safeFormat import safeFormat,cleanString
 from pandas.api.types import is_numeric_dtype
 from dataclasses import dataclass,field
+import numpy as np
 import os
 
 defaultSettings = baseDataClass().loadDict(os.path.join(os.getcwd(),'configurationFiles','defaultSettings.yml'))
@@ -50,11 +51,20 @@ class firstStageTrace(sharedMethods):
     dtype: str = field(default=defaultSettings['defaultDataType'],metadata=mdMap('data type (float32, int64, etc.)'))
     inputFiles: dict = None
     inputDates: list = field(default_factory=list,metadata=mdMap('date rang corresponding to input files (s)'),repr=False)
-    dependent: list = field(default_factory=list,metadata=mdMap('Other variables upon which this trace will be filtered for nan'))
-    singlePointInterpolation: bool = False
-    linearRescale: list = field(default=None,metadata=mdMap('List of one or more len=4 list [m,b,start,stop].  Rescales as dataTrace = m*dataTrace+b over range [start:stop], or full trace if start and stop are None'))
     
+    minMax: list = field(default_factory=lambda:[-np.inf,np.inf], metadata=mdMap('optional to set min/max clipping'))
+    clamped_minMax: list = field(default_factory=lambda:[-np.inf,np.inf], metadata=mdMap('optional to set min/max clipping'))
+    # Evaluate: Iterable = field(default=None,metadata=mdMap('Code block, evaluated using an exec statement, to manipulate the trace variable'))
+    dependent: list = field(default_factory=list,metadata=mdMap('Other variables upon which this trace will be filtered for nan'))
+    # linearInterpLimit: int = 1
+    linearRescale: list = field(default=None,metadata=mdMap('List of one or more len=4 list [m,b,start,stop].  Rescales as dataTrace = m*dataTrace+b over range [start:stop], or full trace if start and stop are None'))
+    notes: str = None
+
     def __post_init__(self):
+        # if isinstance(self.inputFiles,list) and isinstance(self.inputDates,list) and isinstance(self.inputDates[0],list):
+        #     self.inputFiles = {f:d for f,d in zip(self.inputFiles,self.inputDates)}
         if not isinstance(self.inputFiles,dict):
             self.inputFiles = {self.inputFiles:self.inputDates}
+        # if not np.issubdtype(self.dtype,np.floating):
+        #     self.linearInterpLimit = 0
         super().__post_init__()

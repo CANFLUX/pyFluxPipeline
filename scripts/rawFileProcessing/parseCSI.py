@@ -138,7 +138,7 @@ class TOB3(csiTable):
             {key:var['dtype'] for key,var in self.indexColumns.items()}
         )
         if self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated().sum():
-            self.logWarning(f'Duplicated timestamps found in {self.fileName} at\n{self.indexTraces[self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)]}\n Replicated indices will be offset by 1ns*(counter) to avoid conflicts')
+            self.logWarning(f"Duplicated timestamps found in {self.fileName} at\n{self.indexTraces[self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)]}\n Replicated indices will be offset by 1ns*(counter) to avoid conflicts")
             ix = self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated()
             rix = self.indexTraces.loc[ix,'RECORD'].astype('int32')
             self.indexTraces.loc[ix,'NANOSECONDS'] += (rix-(rix.min()+1))
@@ -203,3 +203,121 @@ class TOB3(csiTable):
         for ix in FP2_ix:
             Body[ix] = FP2_map(Body[ix])
         return(Body)
+    
+class MixedArray(csiTable):
+
+    def readMixedArray(self):
+        if self.traces == {}:
+            self.readDEF()
+        else:
+            self.readArray()
+    
+    def readDEF(self):
+        with open(self.templateFile,'r',encoding='utf-8-sig') as f:
+            lines = f.readlines()
+        Header,header = '',True
+        Wiring,wiring = '',False
+        Labels,labels = {},False
+        entries = False
+        tableID,Tables,tables,ntables = None,{},False,0
+        self.mxCols = 0
+        for i,l in enumerate(lines):
+            if 'final storage' in l:
+                Storage = l
+            elif 'Output_Table' in l or tables:
+                tables = True
+                if 'Output_Table' in l:
+                    ntables += 1
+                    tableID,self.dataIntervalSeconds = [m.strip() for m in l.split('Output_Table')]
+                    self.dataIntervalSeconds = pd.to_timedelta(parseFrequency(self.dataIntervalSeconds)).total_seconds()
+                    tableID = int(tableID)
+                    Tables[tableID] = ''
+                else:
+                    Tables[tableID]  = Tables[tableID]+l
+            elif 'Table Entries' in l:
+                entries = True
+            elif 'Labels' in l or labels:
+                labels = True
+                if 'Labels' not in l:
+                    l = l.split()
+                    if len(l):
+                        if not l[0].isdigit():
+                            sensor = '_'.join(l)
+                        else:
+                            Labels[l[1]]=sensor
+            elif 'Wiring' in l or wiring:
+                if 'Wiring' in l:
+                    self.loggerModel = l.split('for ')[-1].rstrip('-\n')
+                wiring = True
+                Wiring = Wiring+l
+            elif header:
+                Header = Header+l
+        for ID in Tables:
+            data = {'originalVariable':[],'units':[],'ignore':[],'dtype':[]}
+            ix = 0
+            for v in Tables[ID].split():
+                if ix == 1:
+                    if v == str(ID):
+                        data['originalVariable'].append(f'{ID}-ID_{v}')
+                        data['dtype'].append('<i2')
+                        ignore=True
+                    else:
+                        data['originalVariable'].append(f'{ID}-{v}')
+                        data['dtype'].append('<f4')
+                        if 'RTM' in v:
+                            ignore=True
+                        else:
+                            ignore=False
+                    # data['originalVariable'].append(v)
+                    operation = v.split('_')[-1]
+                    if operation not in ['AVG','STD','MAX','MIN','TOT']:
+                        operation = ''
+                    r = v.rstrip(f'_{operation}').split('_')
+                    if r[-1][0].isdigit():
+                        r.pop(-1)
+                    if len(r)>1:
+                        unit = r[-1]
+                    else:
+                        unit = ''
+                    # data['operation'].append(operation)
+                    data['units'].append(unit)
+                    data['ignore'].append(ignore)
+                ix += 1
+                if ix ==3: ix = 0
+            
+            df = pd.DataFrame(data=data)
+            if len(df.index)>self.mxCols:
+                self.mxCols = len(df.index)
+            df['sensorID'] = ''
+            for l,sensor in Labels.items():
+                df.loc[df['originalVariable'].str.contains(l),'sensorID']=sensor
+            df.index = df['originalVariable']
+            self.traces = {key:rawTrace(originalVariable=key,units=value['units'],dtype=value['dtype']).to_dict() for key,value in df.to_dict('index').items()}
+            # df = {key:csiTrace.from_dict(value|{'ignoreByDefault':self.ignoreTraces,'kwargs':self.traceKwargs.copy(),'stageID':self.stageID}).to_dict() for key,value in df.to_dict('index').items()}
+            # self.traces = self.updateDict(self.traces,df)
+            
+            
+    def readArray(self):
+        # Count by arrayID prefixes to get max cols
+        self.mxCols = pd.DataFrame(data=[k.split('-') for k in self.traces.keys()],columns=['Array','Cols']).groupby('Array').count().max().values[0]
+        df = pd.read_csv(self.fileName,header=None,names=[i for i in range(self.mxCols)])
+        cols = list(self.traces.keys())
+        for i,ID in enumerate(df[0].unique()):
+            sub = df.loc[df[0]==ID].copy()
+            sub = sub.dropna(how='all',axis=1)
+            sub.columns = [c for c in cols if int(c.split('-')[0])==ID]
+            HHMM = sub[f'{ID}-Hour_Minute_RTM'].astype(str).str.zfill(4)
+            HH = HHMM.str[:2]
+            MM = HHMM.str[2:4]
+            SS = '00'
+            HHMM = HH+':'+MM+':'+SS
+            YJ = sub[f'{ID}-Year_RTM'].astype(str)+'-'+sub[f'{ID}-Day_RTM'].astype(str)
+            sub.index = pd.DatetimeIndex(pd.to_datetime(YJ,format='%Y-%j')+pd.to_timedelta(HHMM))
+            if i == 0:
+                self.dataTable = sub.copy()
+            else:
+                self.dataTable = self.dataTable.join(sub,how='outer')
+        self.dataTable = self.dataTable.loc[~self.dataTable.index.duplicated(keep='last')]
+        typeMap = {var['originalVariable']:var['dtype'] for var in self.traces.values()}
+        self.dataTable = self.dataTable.astype(typeMap)
+        # self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)

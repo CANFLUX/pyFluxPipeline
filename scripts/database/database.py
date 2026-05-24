@@ -5,6 +5,7 @@ from datetime import datetime
 from scripts.project import project
 import pandas as pd
 import numpy as np
+import shutil
 import os
 
 
@@ -75,19 +76,16 @@ class database(defaultSettings):
         return(empty)
 
     def loadTraceFolder(self,traceFolder,expectedTraces={}):
-        try:
-            dataTable = pd.DataFrame(
-                data = {f.split('.')[0]:self.readTrace(os.path.join(traceFolder,f)) for f in os.listdir(traceFolder)}
-            )
-            expectedTraces = {key:value for key,value in expectedTraces.items() if key not in dataTable.columns}
-            if len(expectedTraces):
-                dataTable = pd.concat([dataTable,self.noDataTable(dataTable.index,expectedTraces)],axis=1)
-            dataTable.index = pd.to_datetime(dataTable['posix_time'],unit='s').dt.tz_localize(self.timezone)
-            return(dataTable)
-        except:
-            breakpoint()
+        dataTable = pd.DataFrame(
+            data = {f.split('.')[0]:self.readTrace(os.path.join(traceFolder,f)) for f in os.listdir(traceFolder)}
+        )
+        expectedTraces = {key:value for key,value in expectedTraces.items() if key not in dataTable.columns}
+        if len(expectedTraces):
+            dataTable = pd.concat([dataTable,self.noDataTable(dataTable.index,expectedTraces)],axis=1)
+        dataTable.index = pd.to_datetime(dataTable[self.posixName],unit='s').dt.tz_localize(self.timezone)
+        return(dataTable)
         
-    def writeTraceFolder(self,newData,siteID,stageID,interval):
+    def writeTraceFolder(self,newData,siteID,stageID,interval=None,clearFirst=False):
         # Output by year, all contents within the dataframe
         if interval is None:
             interval = self.dataIntervalSeconds
@@ -98,6 +96,9 @@ class database(defaultSettings):
             stopTime = posixYearIndex[posixYearIndex==year+1].index[0]
             traceFolder = os.path.join(self.databasePath,str(year),siteID,stageID)
             if not os.path.exists(traceFolder):
+                os.makedirs(traceFolder)
+            elif clearFirst and len(os.listdir(traceFolder)):
+                shutil.rmtree(traceFolder)
                 os.makedirs(traceFolder)
             for traceName in newData.columns:
                 self.writeTrace(

@@ -1,10 +1,10 @@
-from scripts.traceAnalysis.traceParameters import firstStageTrace
+
 from scripts.rawFileProcessing.rawFile import rawFile
+from ruamel.yaml.comments import CommentedSeq
 from dataclasses import dataclass, field
 from datetime import datetime
 import pandas as pd
 import fnmatch
-from ruamel.yaml.comments import CommentedSeq
 from time import time
 import os
 
@@ -34,7 +34,7 @@ class fileInventory(rawFile):
                 [os.path.relpath(dir,sourceDir),f]
                 for f in fname if f.endswith(self.fileExtension) and
                 (self.fileNameMatch is None or fnmatch.fnmatch(f,self.fileNameMatch)) and
-                os.path.join(dir,f) not in pathList]
+                os.path.join(dir,f) not in pathList and os.path.join(dir,'.',f) not in pathList]
             if len(fname):
                 T1 = time()
                 if sourceDir not in self.fileInventory:
@@ -51,38 +51,11 @@ class fileInventory(rawFile):
                     if subDir not in self.fileInventory[sourceDir]:
                         self.fileInventory[sourceDir][subDir] = {}
                     self.fileInventory[sourceDir][subDir][fileName] = dtNow
-                self.logMessage(f"loaded contents of {os.path.join(dir)} in {time()-T1} s")
-
-        self.formatIni()
-        self.saveDict(self.fileInventory,self.fileInventoryPath)
+                self.logMessage(f"loaded {len(fname)} files from {os.path.join(dir)} in {time()-T1} s")
+        if nNew>0:
+            self.siteConfig.ini['rawData'][self.fileID][0] = self.dateRange[0]
+            self.siteConfig.ini['rawData'][self.fileID][1] = self.dateRange[1]
+            self.saveDict(self.siteConfig.ini,self.siteConfig.iniPath)
+            self.saveDict(self.fileInventory,self.fileInventoryPath)
         
-        
-    def formatIni(self):
-        raw = self.siteConfig.ini['rawData']
-        first = self.siteConfig.ini['Processing']['FirstStage']
-        if self.fileID not in raw:
-            raw[self.fileID] = {}
-        inputDates = CommentedSeq(self.dateRange)
-        inputDates.yaml_set_anchor(f'{self.fileID}_inputDatess')
-        raw[self.fileID] = inputDates
-        for value in self.traces.values():
-            if not value['ignore']:
-                inputFile = f"{self.fileID}.{value['variableName']}"
-                key = value['variableName']
-                if key not in first:
-                    first[key] = firstStageTrace.from_dict(value|{'inputFiles':inputFile,'inputDates':inputDates}).to_dict()
-                elif inputFile not in first[key]['inputFiles']:
-                    incomingDates = pd.to_datetime(inputDates)
-                    for current,value in first[key]['inputFiles'].items():
-                        currentDates = pd.to_datetime(value)
-                        test = (incomingDates[0]>=currentDates[0] and incomingDates[0]<=currentDates[1]) or (incomingDates[1]>=currentDates[0] and incomingDates[1]<=currentDates[1])
-                        if test:
-                            self.logWarning(f'inputDates for {current} and {inputFile} overlap.  Default behavior is for last file listed to over-write all previous where ranges overlap.  Double check config ensure this is desired behavior.')
-                    
-                    first[key]['inputFiles'][inputFile] = inputDates
-                else:
-                    first[key]['inputFiles'][inputFile] = inputDates
-
-        self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,'rawFiles',f'{self.fileID}.yml'))
-        self.saveDict(self.siteConfig.ini,self.siteConfig.iniPath)
         

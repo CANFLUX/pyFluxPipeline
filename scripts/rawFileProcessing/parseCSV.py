@@ -50,7 +50,23 @@ class csvFile(sharedFields):
         self.typeMap = self.dataTable.dtypes
         self.typeMap[self.typeMap=='float64'] = 'float32'
         self.dataTable = self.dataTable.astype(self.typeMap)
+
+class NARRcsv(csvFile):
+
+    def readNARRcsv(self):
+        if not hasattr(self,'siteID'):
+            self.siteID = None
+        self.dataIntervalSeconds = 1800.0*6
+        self.skipRows = 0
+        self.headerRows = 3
+        self.labelColumnBy = 'index'
+        self.open_csv_file()
+        self.dataTable.index=pd.to_datetime(self.dataTable[0])
         
+        if self.traces == {}:
+            self.traces = {i:rawTrace.from_dict(
+                {'originalVariable':variable,'units':unit,'dtype':self.typeMap[i]}).to_dict() for i,(siteID,variable,unit) in enumerate(zip(self.header[0],self.header[1],self.header[2])) if siteID == self.siteID}
+
 
 # @dataclass(kw_only=True)
 class EddyProOutput(csvFile):

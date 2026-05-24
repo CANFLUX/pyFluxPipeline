@@ -6,23 +6,27 @@ from scripts.newProject import createProject
 import shutil
 import os
 
-projectPath = 'testing/testProject'
-if os.path.exists(projectPath):
-    shutil.rmtree(projectPath)
+reset = True
 
-createProject(projectPath=projectPath,sites=[
-    'configurationFiles/SCL_template.yml', # Template from preexisting metadata file for SCL
-    {'siteID': 'BSP','lat_lon': [69.319431, -135.478286],'startDate':'2026-06-01'}, # Template from dict for BSP
-    'FIL' # Generic template for site FIL
-    ])
+drive = 'E:'
+if not os.path.isdir(drive):
+    drive = 'D:'
+projectPath = f'{drive}/GSC_Work/deltaFluxes'
+if reset:
+    if os.path.exists(projectPath):
+        shutil.rmtree(projectPath)
+if not os.path.isdir(projectPath):
+    createProject(projectPath=projectPath,sites=[
+        'configurationFiles/SCL_template.yml', # Template from preexisting metadata file for SCL
+        {'siteID': 'BSP','lat_lon': [69.319431, -135.478286],'startDate':'2026-06-01'}, # Template from dict for BSP
+        'FIL', # Generic template for site FIL and ILL
+        'ILL'
+        ])
 
-root=  r'E:\data-dump\SCL'
-if not os.path.isdir(root):
-    root = r'D:\data-dump\SCL'
 
 # inspect the traces in raw files
 Met2024 = rawFile(
-    fileName=root + r"\2024\20240912\Met_Data120.dat",
+    fileName=f"{drive}/data-dump/SCL/2024/20240912/Met_Data120.dat",
     fileID='Met2024',
     siteID='SCL',
     fileNameMatch='Met_Data*.dat',
@@ -31,69 +35,142 @@ Met2024 = rawFile(
     mode='identifyTraces'
     )
 
+MetWx2024 = rawFile(
+    templateFile=f"{drive}/data-dump/SCL/2024/20240914/OverWinter.DEF",
+    fileName=f"{drive}/data-dump/SCL/2024/20240914/WX_data.dat",
+    fileID='MetWx2024',
+    siteID='SCL',
+    fileNameMatch='WX_data.dat',
+    fileFormat='MixedArray',
+    projectPath=projectPath,
+    mode='identifyTraces'
+)
+
 # inspect the traces in raw files
 Flux2024 = rawFile(
-    fileName=root +r'\2024\eddypro_t_full_output_2025-05-02T224906_exp.csv',
+    fileName=f"{drive}/data-dump/SCL/2024/eddypro_t_full_output_2025-05-02T224906_exp.csv",
     fileID='Flux2024',
     siteID='SCL',
     fileNameMatch='eddypro_t_full_output*.csv',
     fileFormat='EddyProOutput',
     projectPath=projectPath,
     mode='identifyTraces',
-    ignore=['DOY','daytime','x_peak','x_offset','x_10%','x_30%','x_50%','x_70%','x_90%']
+    ignore=['DOY','daytime','x_peak','x_offset','x_10%','x_30%','x_50%','x_70%','x_90%','daytime','model','amplitude_resolution_hf','drop_out_hf','h2o_def_timelag','co2_def_timelag','ch4_def_timelag','bad_aux_tc1_LI-7700','bad_aux_tc2_LI-7700','bad_aux_tc1_LI-7700']
     )
 
 Flux2025 = rawFile(
-    fileName=root +'/2025/20250806/57840_Flux_CSFormat_19.dat',
+    fileName=f"{drive}/data-dump/SCL/2025/20250806/57840_Flux_CSFormat_19.dat",
     fileID='Flux2025',
     siteID='SCL',
     fileNameMatch='57840_Flux_CSFormat_*.dat',
     fileFormat='TOB3',
     projectPath=projectPath,
     mode='identifyTraces',
-    ignore=['FETCH_MAX','FETCH_90','FETCH_80','FETCH_70','FETCH_FILTER','FETCH_INTRST','FP_FETCH_INTRST','FP_FETCH_INTRST','FP_EQUATION','daytime']
+    ignore=['FETCH_MAX','FETCH_90','FETCH_80','FETCH_70','FETCH_FILTER','FETCH_INTRST','FP_FETCH_INTRST','FP_FETCH_INTRST','FP_EQUATION']
 )
 
-
-# inspect the traces in raw files
 SSM = rawFile(
-    fileName=root + r"\2024\20240914\20750528-SHSC.SSM.SGT.240720_240913readout.csv",
+    fileName=f"{drive}/data-dump/SCL/2024/20240914/20750528-SHSC.SSM.SGT.240720_240913readout.csv",
     fileID='SSM_TS',
     siteID='SCL',
     fileNameMatch='20750528-SHSC.SSM.SGT*.csv',
     fileFormat='HOBOcsv',
     projectPath=projectPath,
     mode='identifyTraces',
-    dataIntervalSeconds=3600.0 # set to were temporarily set to half-hourly, can just drop those data
+    dataIntervalSeconds=3600.0 # were temporarily set to half-hourly, can just drop those data
     )
-print('Edit: ',os.path.join(Met2024.projectPath,'Sites',Met2024.siteID,'rawFiles',f'{Met2024.fileID}.yml'))
-print('Edit: ',os.path.join(Flux2024.projectPath,'Sites',Flux2024.siteID,F'rawFiles',f'{Flux2024.fileID}.yml'))
-# breakpoint()
-fileInventory(
+
+
+WSM = rawFile(
+    fileName=f"{drive}/data-dump/SCL/2024/20240914/20750527-SHSC.WSM.SGT.240720_240913readout.csv",
+    fileID='SSM_TS',
+    siteID='SCL',
+    fileNameMatch='20750527-SHSC.WSM.SGT*.csv',
+    fileFormat='HOBOcsv',
+    projectPath=projectPath,
+    mode='identifyTraces',
+    dataIntervalSeconds=3600.0 # were temporarily set to half-hourly, can just drop those data
+    )
+
+Met2024 = fileInventory(
     fileID=Met2024.fileID,
     siteID=Met2024.siteID,
     fileFormat=Met2024.fileFormat,
-    projectPath=projectPath).fileSearch(root + r'\2024')
-fileInventory(
+    projectPath=projectPath).fileSearch(f"{drive}/data-dump/SCL/2024")
+
+MetWx2024 = fileInventory(
+    fileID=MetWx2024.fileID,
+    siteID=MetWx2024.siteID,
+    fileFormat=MetWx2024.fileFormat,
+    projectPath=projectPath)
+MetWx2024.fileSearch(f"{drive}/data-dump/SCL/2024/20240914")
+MetWx2024.fileSearch(f"{drive}/data-dump/SCL/2025/20250414")
+MetWx2024.fileSearch(f"{drive}/data-dump/SCL/2025/20250619")
+
+Flux2024 = fileInventory(
     fileID=Flux2024.fileID,
     siteID=Flux2024.siteID,
     fileFormat=Flux2024.fileFormat,
-    projectPath=projectPath).fileSearch(root + r'\2024')
-fileInventory(
+    projectPath=projectPath).fileSearch(f"{drive}/data-dump/SCL/2024")
+
+Flux2025 = fileInventory(
     fileID=Flux2025.fileID,
     siteID=Flux2025.siteID,
     fileFormat=Flux2025.fileFormat,
-    projectPath=projectPath).fileSearch(root + r'\2025')
-fileInventory(
-    fileID=Flux2025.fileID,
-    siteID=Flux2025.siteID,
-    fileFormat=Flux2025.fileFormat,
-    projectPath=projectPath).fileSearch(root + r'\2026')
-fileInventory(
+    projectPath=projectPath)
+Flux2025.fileSearch(f"{drive}/data-dump/SCL/2025")
+Flux2025.fileSearch(f"{drive}/data-dump/SCL/2026")
+
+SSM = fileInventory(
     fileID=SSM.fileID,
     siteID=SSM.siteID,
     fileFormat=SSM.fileFormat,
-    projectPath=projectPath).fileSearch(root)
+    projectPath=projectPath)
+SSM.fileSearch(f"{drive}/data-dump/SCL/2024/20240914")
+SSM.fileSearch(f"{drive}/data-dump/SCL/2025/20250718")
+
+WSM = fileInventory(
+    fileID=WSM.fileID,
+    siteID=WSM.siteID,
+    fileFormat=WSM.fileFormat,
+    projectPath=projectPath)
+WSM.fileSearch(f"{drive}/data-dump/SCL/2024/20240914")
+WSM.fileSearch(f"{drive}/data-dump/SCL/2025/20250718")
+
+
+NARR_SCL = rawFile(
+    fileName=f"{drive}/data-dump/ncFiles/interpolatedTimeSeries.csv",
+    fileID='NARR',
+    siteID='SCL',
+    fileNameMatch='interpolatedTimeSeries.csv',
+    fileFormat='NARRcsv',
+    projectPath=projectPath,
+    mode='identifyTraces'
+)
+
+fileInventory(
+    fileID=NARR_SCL.fileID,
+    siteID=NARR_SCL.siteID,
+    fileFormat=NARR_SCL.fileFormat,
+    projectPath=projectPath).fileSearch(f"{drive}/data-dump/ncFiles")
+
+
+NARR_BSP = rawFile(
+    fileName=f"{drive}/data-dump/ncFiles/interpolatedTimeSeries.csv",
+    fileID='NARR',
+    siteID='BSP',
+    fileNameMatch='interpolatedTimeSeries.csv',
+    fileFormat='NARRcsv',
+    projectPath=projectPath,
+    mode='identifyTraces'
+)
+
+fileInventory(
+    fileID=NARR_BSP.fileID,
+    siteID=NARR_BSP.siteID,
+    fileFormat=NARR_BSP.fileFormat,
+    projectPath=projectPath).fileSearch(f"{drive}/data-dump/ncFiles")
+
 
 # firstStage(projectPath=projectPath,sites='SCL',years=[2024,2025])
 

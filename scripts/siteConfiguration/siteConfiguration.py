@@ -1,7 +1,7 @@
 from scripts.siteConfiguration.hardware import dataLogger,sensor
-# from scripts.siteConfiguration.rawData import rawFileParameters
-from dataclasses import dataclass, field
 from helperFunctions.baseClass import spatialObject,mdMap
+from ruamel.yaml.scalarstring import LiteralScalarString
+from dataclasses import dataclass, field
 from datetime import datetime
 from scripts.project import project
 import os
@@ -18,7 +18,7 @@ class configMetadata:
 @dataclass(kw_only=True)
 class configTemplate:
     Metadata: dict = None
-    rawData: dict = field(default_factory=dict)
+    rawData: dict = field(default_factory=lambda:{'preEvaluate':LiteralScalarString('#Codespace for preEvaluate corrections\n#unit conversions and corrections (e.g Convert F to C)\n# rawData["TA"]=(rawData["TA"]-32)*5/9')})
     Processing: dict = field(default_factory=lambda:{'FirstStage':{},'SecondStage':{},'ThirdStage':{}})
     def __post_init__(self):
         # if isinstance(self.Metadata,str):

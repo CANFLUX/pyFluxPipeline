@@ -36,7 +36,6 @@ class firstStage(database):
             for value in siteConfig.ini['Processing']['FirstStage'].values():
                 value = firstStageTrace.from_dict(value).to_dict()
                 iniFirstStage[value['variableName']] = value
-            # value['variableName']:value for value in siteConfig.ini['Processing']['FirstStage'].values()}
             # and for of desired types for raw inputs outputs
             dataTable = self.noDataTable(timestamp,{key:value['dtype'] for key,value in iniFirstStage.items()})
             dataTable[self.posixName] = posix_time
@@ -52,6 +51,8 @@ class firstStage(database):
             typeMap = {f"{key}.{k}":v['dtype'] for key in metadataIn.keys() for k,v in metadataIn[key]['traces'].items() if not v['ignore']}
             # create empty dataframe of desired types for raw inputs
             rawData = self.noDataTable(timestamp,typeMap)
+
+            
            
             # Load raw traces
             dby = os.path.join(self.projectPath,'Database','YYYY',siteID,'raw')
@@ -61,6 +62,10 @@ class firstStage(database):
                     self.logError('Not setup for >30min freq yet')
                 dbyPth = os.path.join(dby,key)
                 dateRange = pd.to_datetime(value['dateRange'])
+                if dateRange[0] < timestamp[0]:
+                    dateRange = pd.to_datetime([timestamp[0],dateRange[1]])
+                if dateRange[-1] > timestamp[-1]:
+                    dateRange = pd.to_datetime([dateRange[0],timestamp[-1]])
                 years = dateRange.year
                 df = pd.concat([self.loadTraceFolder(dbyPth.replace('YYYY',str(year))) for year in range(years[0],years[-1]+1)])
                 df.columns = [f"{key}.{c}" for c in df.columns]
@@ -69,14 +74,19 @@ class firstStage(database):
                 # as constituent dataframes may not have mutually inclusive indices 
                 rawData.loc[df.index,df.columns] = df.copy()
             
+            rawData.to_csv('testing/rawData.csv',index_label='timestamp')
+            
             if preEvaluate:    
                 exec(preEvaluate)
-    
+                
             firstStageDependencies = {} 
             for traceName,traceFS in iniFirstStage.items():
+                if traceName == self.posixName:
+                    continue
                 for key,value in traceFS['inputFiles'].items():
                     value = pd.to_datetime(value)
-                    dataTable.loc[value[0]:value[-1],traceName] = rawData.loc[value[0]:value[-1],key].copy()                       
+                    dataTable.loc[value[0]:value[-1],traceName] = rawData.loc[value[0]:value[-1],key].copy()  
+
                 if traceFS['minMax'] != [-np.inf,np.inf]:
                     dataTable.loc[
                         ((dataTable[traceName]<traceFS['minMax'][0])|(dataTable[traceName]>traceFS['minMax'][-1])),
@@ -88,7 +98,6 @@ class firstStage(database):
                 dataTable = self.Dependencies(dataTable,firstStageDependencies)
             self.writeTraceFolder(dataTable,siteID,'FirstStage',clearFirst=True)
             print(f'Executed {siteID} FirstStage in:',time()-T1)
-
             
     def Dependencies(self,dataTable,dependencies):
         if len(dependencies):

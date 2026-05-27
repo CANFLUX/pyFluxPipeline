@@ -63,12 +63,19 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv,MixedArray,NARRcsv):
         #     self.readTOA5()
         # elif self.fileFormat == 'MixedArray':
         #     self.readMixedArray()
+        
         if self.mode == 'identifyTraces':
             self.templateFile = self.fileName
             # Update ignores (user provided or defaults from processor)
             if self.ignore is not None:
-                for ignore in self.ignore:
-                    self.traces[ignore]['ignore'] = True
+                if '*!' in self.ignore:
+                    for key in self.traces:
+                        if key != '*!' and key not in self.ignore:
+                            self.traces[key]['ignore'] = True
+                else:
+                    for key in self.ignore:
+                        if key in self.traces:
+                            self.traces[key]['ignore'] = True
             self.saveConfigFile(self.fileConfigPath)
             if self.dataIntervalSeconds is None:
                 self.logMessage(f'confirm dataIntervalSeconds inferred from table correctly: {self.dataIntervalSeconds}')
@@ -117,7 +124,6 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv,MixedArray,NARRcsv):
             self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)
         elif str(self.dataTable.index.tz) != self.timezone:
             self.logError('Mismatching timezones.  Add timezone converter here')
-            breakpoint()
         if self.dateRange == self.__dataclass_fields__['dateRange'].default_factory():
             self.dateRange = [self.dataTable.index.min().isoformat(),self.dataTable.index.max().isoformat()]
         else:
@@ -149,7 +155,6 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv,MixedArray,NARRcsv):
             
             self.saveConfigFile(self.fileConfigPath)
             self.saveDict(self.siteConfig.ini,self.siteConfig.iniPath)
-            # breakpoint()
 
         # for value in self.traces.values():
         #     if not value['ignore']:
@@ -178,5 +183,3 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv,MixedArray,NARRcsv):
 # python -m scripts.rawFileProcessing.rawFile --fileName testing\data\20750528-SHSC.SSM.SGT.240720_240913readout.csv --siteID SCL --projectPath testing/testProject --fileFormat HOBOcsv --fileID TS_SSM
 if __name__ == '__main__':
     current = rawFile.from_cmd(safeMode=False)
-
-    breakpoint()

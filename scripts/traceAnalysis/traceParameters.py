@@ -1,20 +1,12 @@
 from helperFunctions.baseClass import baseDataClass,mdMap
 from helperFunctions.safeFormat import safeFormat,cleanString
+from ruamel.yaml.scalarstring import LiteralScalarString
 from pandas.api.types import is_numeric_dtype
 from dataclasses import dataclass,field
 import numpy as np
 import os
 
 defaultSettings = baseDataClass().loadDict(os.path.join(os.getcwd(),'configurationFiles','defaultSettings.yml'))
-
-# @dataclass(kw_only=True)
-# class common(baseDataClass):
-#     variableName: str = field(default=None,metadata=mdMap('Name of the variable (must be filename safe, alphanumeric with underscores accepted)'))
-    
-#     def __post_init__(self):
-#         self.variableName = safeFormat(self.variableName)
-#         self.units = cleanString(self.units,permit={'°','µ'})
-#         super().__post_init__()
 
 class sharedMethods(baseDataClass):
 
@@ -57,7 +49,7 @@ class firstStageTrace(sharedMethods):
     # Evaluate: Iterable = field(default=None,metadata=mdMap('Code block, evaluated using an exec statement, to manipulate the trace variable'))
     dependent: list = field(default_factory=list,metadata=mdMap('Other variables upon which this trace will be filtered for nan'))
     # linearInterpLimit: int = 1
-    linearRescale: list = field(default=None,metadata=mdMap('List of one or more len=4 list [m,b,start,stop].  Rescales as dataTrace = m*dataTrace+b over range [start:stop], or full trace if start and stop are None'))
+    # linearRescale: list = field(default=None,metadata=mdMap('List of one or more len=4 list [m,b,start,stop].  Rescales as dataTrace = m*dataTrace+b over range [start:stop], or full trace if start and stop are None'))
     notes: str = None
 
     def __post_init__(self):
@@ -67,4 +59,17 @@ class firstStageTrace(sharedMethods):
             self.inputFiles = {self.inputFiles:self.inputDates}
         # if not np.issubdtype(self.dtype,np.floating):
         #     self.linearInterpLimit = 0
+        super().__post_init__()
+
+@dataclass(kw_only=True)
+class secondStageTrace(sharedMethods):
+    variableName: str = field(default=None,metadata=mdMap('Name of the variable (must be filename safe, alphanumeric with underscores accepted)'))
+    units: str = field(default='', metadata=mdMap(''))
+    dtype: str = field(default=defaultSettings['defaultDataType'],metadata=mdMap('data type (float32, int64, etc.)'))
+    linearInterpLimit: int = 0
+    minMax: list = field(default_factory=lambda:[-np.inf,np.inf], metadata=mdMap('optional to set min/max clipping'))
+    Evaluate: str = ''
+
+    def __post_init__(self):
+        self.Evaluate = LiteralScalarString(self.Evaluate)
         super().__post_init__()

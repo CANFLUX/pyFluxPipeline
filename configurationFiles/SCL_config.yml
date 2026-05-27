@@ -1,0 +1,418 @@
+Metadata:
+  AmerifluxID:
+  lat: 69.2264167
+  long: -135.2519067
+  siteID: SCL
+  startYear:
+  stopYear:
+  timezone:
+rawData:
+  preEvaluate: |-
+    #Codespace for preEvaluate corrections
+    # Convert AGC
+    rawData["Flux2024.co2_signal_mean"] = (100-(rawData["Flux2024.mean_value_AGC_LI-7500"]-rawData["Flux2024.mean_value_AGC_LI-7500"].min()))
+    rawData["Flux2024.h2o_signal_mean"] = (100-(rawData["Flux2024.mean_value_AGC_LI-7500"]-rawData["Flux2024.mean_value_AGC_LI-7500"].min()))
+    rawData["Flux2025.co2_signal_mean"] *= 100
+    rawData["Flux2025.h2o_signal_mean"] *= 100
+    # 15 degree missalignment in record (incorrect declination used originally)
+    offset = -24.5
+    rawData["Flux2024.wind_dir"] = rawData["Flux2024.wind_dir"]+offset
+    rawData.loc[rawData["Flux2024.wind_dir"]>360,"Flux2024.wind_dir"] -= 360
+    rawData.loc[rawData["Flux2024.wind_dir"]<0,"Flux2024.wind_dir"] += 360
+    rawData["Flux2025.wind_dir"] = rawData["Flux2025.wind_dir"]+offset
+    rawData.loc[rawData["Flux2025.wind_dir"]>360,"Flux2025.wind_dir"] -= 360
+    rawData.loc[rawData["Flux2025.wind_dir"]<0,"Flux2025.wind_dir"] += 360
+    bearing = 8.5
+    rawData["Flux2024.wind_dir_flag"] = rawData["Flux2024.wind_dir"].copy()
+    rawData.loc[((rawData["Flux2024.wind_dir_flag"]<bearing+180+30)&(rawData["Flux2024.wind_dir_flag"]>bearing+180-30)),"Flux2024.wind_dir_flag"] = np.nan
+    rawData["Flux2025.wind_dir_flag"] = rawData["Flux2025.wind_dir"].copy()
+    rawData.loc[((rawData["Flux2025.wind_dir_flag"]<bearing+180+30)&(rawData["Flux2025.wind_dir_flag"]>bearing+180-30)),"Flux2025.wind_dir_flag"] = np.nan
+  Met2024: &Met2024.inputDates
+  - '2024-07-20T21:00:00+00:00'
+  - '2024-09-13T00:30:00+00:00'
+  MetWx2024: &MetWx2024.inputDates
+  - '2024-09-13T22:30:00+00:00'
+  - '2025-06-19T17:30:00+00:00'
+  Flux2024: &Flux2024.inputDates
+  - '2024-07-25T03:30:00+00:00'
+  - '2024-09-13T00:30:00+00:00'
+  Met2025: &Met2025.inputDates
+  - '2025-06-05T23:00:00+00:00'
+  - '2026-04-11T00:00:00+00:00'
+  Flux2025: &Flux2025.inputDates
+  - '2025-08-03T03:00:00+00:00'
+  - '2025-09-27T18:00:00+00:00'
+  SSM_TS: &SSM_TS.inputDates
+  - '2024-07-20T21:00:00+00:00'
+  - '2025-07-18T16:00:00+00:00'
+  NARR: &NARR.inputDates
+  - '2024-01-01T00:00:00+00:00'
+  - '2026-03-31T21:00:00+00:00'
+Processing:
+  FirstStage:
+    posix_time:
+      variableName: posix_time
+      units: s
+      dtype: int64
+      inputFiles:
+        Met2024.posix_time: *Met2024.inputDates
+        MetWx2024.posix_time: *MetWx2024.inputDates
+        Flux2024.posix_time: *Flux2024.inputDates
+        Met2025.posix_time: *Met2025.inputDates
+        Flux2025.posix_time: *Flux2025.inputDates
+        SSM_TS.posix_time: *SSM_TS.inputDates
+        NARR.posix_time: *NARR.inputDates
+      minMax:
+      - -.inf
+      - .inf
+      clamped_minMax:
+      - -.inf
+      - .inf
+      dependent: []
+      linearRescale:
+      notes: default time-trace (seconds since unix epoch)
+    TA_1_1_1:
+      variableName: TA_1_1_1
+      units: C
+      inputFiles:
+        Met2024.AirTC_Avg: *Met2024.inputDates
+        MetWx2024.101-AirTC_AVG: *MetWx2024.inputDates
+        Met2025.TA_1_1_3: *Flux2025.inputDates
+      minMax:
+      - -50
+      - 50
+    TA_NARR:
+      variableName: TA_NARR
+      units: K
+      inputFiles:
+        NARR.air_2m: *NARR.inputDates
+      minMax:
+      - 223.15
+      - 323.15
+    RH_1_1_1:
+      variableName: RH_1_1_1
+      units: C
+      inputFiles:
+        Met2024.RH: *Met2024.inputDates
+        MetWx2024.101-RH: *MetWx2024.inputDates
+        Met2025.RH_1_1_2: *Flux2025.inputDates
+      minMax:
+      - -10
+      - 110
+      clampedMinMax:
+      - 0
+      - 100
+    RH_NARR:
+      variableName: RH_NARR
+      units: '%'
+      inputFiles:
+        NARR.rhum_2m: *NARR.inputDates
+    SW_IN_1_1_1:
+      variableName: SW_IN_1_1_1
+      units: Wm-2
+      inputFiles:
+        Met2024.SlrW_Avg: *Met2024.inputDates
+        MetWx2024.101-SlrW_AVG:
+        - '2024-09-13T22:30:00+00:00'
+        - '2025-03-01T23:30:00+00:00'
+        Met2025.SW_IN: *Flux2025.inputDates
+    SW_IN_NARR:
+      variableName: SW_IN_NARR
+      units: Wm-2
+      inputFiles:
+        NARR.dswrf: *NARR.inputDates
+    PA_1_1_1:
+      variableName: PA_1_1_1
+      units: Pa
+      inputFiles:
+        Flux2024.air_pressure: *Flux2024.inputDates
+        Flux2025.air_pressure: *Flux2025.inputDates
+    PA_NARR:
+      variableName: PA_NARR
+      units: Pa
+      inputFiles:
+        NARR.pres_sfc: *NARR.inputDates
+    P_NARR:
+      variableName: P_NARR
+      units: Kg/m-2
+      inputFiles:
+        NARR.apcp: *NARR.inputDates
+    ustar:
+      variableName: ustar
+      units: ms-1
+      inputFiles:
+        Flux2024.ustar: *Flux2024.inputDates
+        Flux2025.ustar: *Flux2025.inputDates
+    ustar_filter:
+      variableName: ustar_filter
+      units: ms-1
+      inputFiles:
+        Flux2024.ustar: *Flux2024.inputDates
+        Flux2025.ustar: *Flux2025.inputDates
+      minMax:
+      - 0.1
+      - 2.0
+    WS_1_1_1:
+      variableName: WS_1_1_1
+      units: ms-1
+      inputFiles:
+        Flux2024.wind_speed: *Flux2024.inputDates
+        Flux2025.wind_speed: *Flux2025.inputDates
+    WD_1_1_1:
+      variableName: WD_1_1_1
+      units: degrees
+      inputFiles:
+        Flux2024.wind_dir: *Flux2024.inputDates
+        Flux2025.wind_dir: *Flux2025.inputDates
+    wind_dir_flag:
+      variableName: wind_dir_flag
+      units: degrees
+      inputFiles:
+        Flux2024.wind_dir_flag: *Flux2024.inputDates
+        Flux2025.wind_dir_flag: *Flux2025.inputDates
+    uwind_NARR:
+      variableName: uwind_NARR
+      units: m s-1
+      inputFiles:
+        NARR.uwnd_10m: *NARR.inputDates
+    vwind_NARR:
+      variableName: vwind_NARR
+      units: m s-1
+      inputFiles:
+        NARR.vwnd_10m: *NARR.inputDates
+    H:
+      variableName: H
+      units: W m-2
+      inputFiles:
+        Flux2024.H: *Flux2024.inputDates
+        Flux2025.H: *Flux2025.inputDates
+      dependent:
+      - H_QC
+      - ustar_filter
+      - wind_dir_flag
+    H_QC:
+      variableName: H_QC
+      units: arb
+      inputFiles:
+        Flux2024.qc_H: *Flux2024.inputDates
+        Flux2025.qc_H: *Flux2025.inputDates
+      minMax:
+      - 0
+      - 1
+    LE:
+      variableName: LE
+      units: W m-2
+      inputFiles:
+        Flux2024.LE: *Flux2024.inputDates
+        Flux2025.LE: *Flux2025.inputDates
+      dependent:
+      - LE_QC
+      - H2O_signal
+      - ustar_filter
+      - wind_dir_flag
+    LE_QC:
+      variableName: LE_QC
+      units: arb
+      inputFiles:
+        Flux2024.qc_LE: *Flux2024.inputDates
+        Flux2025.qc_LE: *Flux2025.inputDates
+      minMax:
+      - 0
+      - 1
+    H2O_signal:
+      variableName: H2O_signal
+      units: umol mol-1
+      inputFiles:
+        Flux2024.h2o_signal_mean: *Flux2024.inputDates
+        Flux2025.h2o_signal_mean: *Flux2025.inputDates
+    FCOC2:
+      variableName: FCO2
+      units: umol m-2 s-1
+      inputFiles:
+        Flux2024.co2_flux: *Flux2024.inputDates
+        Flux2025.co2_flux: *Flux2025.inputDates
+      minMax:
+      - -15
+      - 5
+      dependent:
+      - FCO2_QC
+      - CO2_signal
+      - ustar_filter
+      - wind_dir_flag
+    FCO2_QC:
+      variableName: FCO2_QC
+      units: arb
+      inputFiles:
+        Flux2024.qc_co2_flux: *Flux2024.inputDates
+        Flux2025.qc_co2_flux: *Flux2025.inputDates
+      minMax:
+      - 0
+      - 1
+    CO2_signal:
+      variableName: CO2_signal
+      units: umol mol-1
+      inputFiles:
+        Flux2024.co2_signal_mean: *Flux2024.inputDates
+        Flux2025.co2_signal_mean: *Flux2025.inputDates
+      minMax:
+      - 90
+      - 110
+    FCH4:
+      variableName: FCH4
+      units: umol m-2 s-1
+      inputFiles:
+        Flux2024.ch4_flux: *Flux2024.inputDates
+        Flux2025.ch4_flux: *Flux2025.inputDates
+      dependent:
+      - FCH4_QC
+      - CH4_signal
+      - ustar_filter
+      - wind_dir_flag
+      minMax:
+      - -0.05
+      - .200
+    FCH4_QC:
+      variableName: FCH4_QC
+      units: arb
+      inputFiles:
+        Flux2024.qc_ch4_flux: *Flux2024.inputDates
+        Flux2025.qc_ch4_flux: *Flux2025.inputDates
+      minMax:
+      - 0
+      - 1
+    CH4_signal:
+      variableName: CH4_signal
+      units: umol mol-1
+      inputFiles:
+        Flux2024.diag_77_mean: *Flux2024.inputDates
+        Flux2025.ch4_signal_mean: *Flux2025.inputDates
+      minMax:
+      - 20
+      - 110
+    TS_1_1_1:
+      variableName: TS_1_1_1
+      units: C
+      inputFiles:
+        SSM_TS.Temp_C_LGR_S_N_20750528_SEN_S_N_20750528_LBL_5: *SSM_TS.inputDates
+      minMax:
+      - -10
+      - 25
+    TS_1_2_1:
+      variableName: TS_1_2_1
+      units: C
+      inputFiles:
+        SSM_TS.Temp_C_LGR_S_N_20750528_SEN_S_N_20750528_LBL_25: *SSM_TS.inputDates
+      minMax:
+      - -10
+      - 25
+    TS_1_3_1:
+      variableName: TS_1_3_1
+      units: C
+      inputFiles:
+        SSM_TS.Temp_C_LGR_S_N_20750528_SEN_S_N_20750528_LBL_50: *SSM_TS.inputDates
+      minMax:
+      - -10
+      - 25
+    TS_1_4_1:
+      variableName: TS_1_4_1
+      units: C
+      inputFiles:
+        SSM_TS.Temp_C_LGR_S_N_20750528_SEN_S_N_20750528_LBL_100: *SSM_TS.inputDates
+      minMax:
+      - -10
+      - 25
+  SecondStage:
+    SW_IN_NARR:
+      variableName: SW_IN_NARR
+      linearInterpLimit: 6
+    TA_NARR:
+      variableName: TA_NARR
+      linearInterpLimit: 6
+    RH_NARR:
+      variableName: RH_NARR
+      linearInterpLimit: 6
+    PA_NARR:
+      variableName: PA_NARR
+      linearInterpLimit: 6
+    P_NARR:
+      variableName: P_NARR
+      linearInterpLimit: 6
+    uwind_NARR:
+      variableName: uwind_NARR
+      units: m s-1
+      inputFiles:
+        NARR.uwnd_10m: *NARR.inputDates
+      linearInterpLimit: 6
+    vwind_NARR:
+      variableName: vwind_NARR
+      units: m s-1
+      inputFiles:
+        NARR.vwnd_10m: *NARR.inputDates
+      linearInterpLimit: 6
+    SW_IN_1_1_1:
+      variableName: SW_IN_1_1_1
+      units: Wm-2
+    TA_1_1_1:
+      variableName: TA_1_1_1
+      units: C
+    RH_1_1_1:
+      variableName: RH_1_1_1
+      units: C
+    VPD_1_1_1:
+      variableName: VPD_1_1_1
+      units: kPa
+      Evaluate: |-
+        dataTable['VPD_1_1_1'] = customMethods.calculateVPD(dataTable['TA_1_1_1'],dataTable['RH_1_1_1'])
+    PA_1_1_1:
+      variableName: PA_1_1_1
+      units: PA
+    TS_1_1_1:
+      variableName: TS_1_1_1
+      units: C
+      linearInterpLimit: 1
+    TS_1_2_1:
+      variableName: TS_1_2_1
+      units: C
+      linearInterpLimit: 1
+    TS_1_3_1:
+      variableName: TS_1_3_1
+      units: C
+      linearInterpLimit: 1
+    TS_1_4_1:
+      variableName: TS_1_4_1
+      units: C
+      linearInterpLimit: 1
+    WS_1_1_1:
+      variableName: WS_1_1_1
+      units: ms-1
+    WD_1_1_1:
+      variableName: WD_1_1_1
+      units: degrees
+    ustar:
+      variableName: ustar
+      units: ms-1
+    H:
+      variableName: H
+      units: W m-2
+    LE:
+      variableName: LE
+      units: W m-2
+    FCO2:
+      variableName: FCO2
+      units: umol m-2 s-1
+    FCH4:
+      variableName: FCH4
+      units: umol m-2 s-1
+    H_QC:
+      variableName: H_QC
+      units: arb
+    LE_QC:
+      variableName: LE_QC
+      units: arb
+    FCO2_QC:
+      variableName: FCO2_QC
+      units: arb
+    FCH4_QC:
+      variableName: FCH4_QC
+      units: arb
+  ThirdStage: {}

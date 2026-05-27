@@ -40,7 +40,7 @@ class csvFile(sharedFields):
             HL = delimSub(HL,subText)
             HL = [format(h) for h in HL.split(self.delimiter)]
             self.header.append(HL)
-
+        
         self.dataTable = pd.read_csv(rawFile,delimiter=self.delimiter,header=None,na_values=self.na_values)
         rawFile.close()
         self.dataTable = self.dataTable.dropna(how='all')
@@ -67,6 +67,7 @@ class NARRcsv(csvFile):
             self.traces = {i:rawTrace.from_dict(
                 {'originalVariable':variable,'units':unit,'dtype':self.typeMap[i]}).to_dict() for i,(siteID,variable,unit) in enumerate(zip(self.header[0],self.header[1],self.header[2])) if siteID == self.siteID}
 
+        # breakpoint()
 
 # @dataclass(kw_only=True)
 class EddyProOutput(csvFile):
@@ -86,10 +87,9 @@ class EddyProOutput(csvFile):
             self.traces = {key:rawTrace.from_dict({'originalVariable':key,'units':value,'dtype':self.typeMap[key]}).to_dict() for i,(key,value) in enumerate(zip(self.header[0],self.header[1]))}
 
         TIMESTAMP = pd.to_datetime(
-            self.dataTable[self.timestampFormat.keys()].agg(' '.join,axis=1),
-            format=' '.join([v for v in self.timestampFormat.values()])
-            )
-
+        self.dataTable[self.timestampFormat.keys()].agg(' '.join,axis=1),
+        format=' '.join([v for v in self.timestampFormat.values()])
+        )
         self.dataTable.index = TIMESTAMP 
 
 # @dataclass(kw_only=True)

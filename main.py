@@ -24,7 +24,7 @@ breakpoint()
 #     projectPath=projectPath,
 #     mode='identifyTraces'
 #     )
-# # breakpoint()
+# 
 # rf = rawFile(
 #     fileName=fileName,
 #     fileID='EP_recalc_2024',
@@ -44,7 +44,7 @@ breakpoint()
 #     projectPath=projectPath,
 #     mode='identifyTraces'
 #     )
-# # breakpoint()
+# 
 # rf = rawFile(
 #     fileName=fileName,
 #     fileID='HOBO_WSM',
@@ -64,7 +64,7 @@ breakpoint()
 #     projectPath=projectPath,
 #     mode='identifyTraces'
 #     )
-# # breakpoint()
+# 
 # rf = rawFile(
 #     fileName=fileName,
 #     fileID='EC_Met',
@@ -86,7 +86,7 @@ breakpoint()
 #     mode='identifyTraces'
 #     )
 
-# breakpoint()
+
 
 
 # python -m main --projectPath testing/testProject --sites configurationFiles/SCL_template.yml
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     breakpoint()
     # current.loadSiteConfiguration()
     # print(current.defaultSettings)
-    # breakpoint()
+    
 
     # fileName = r"E:\data-dump\SCL\EddyPro\2024\eddypro_t_full_output_2025-05-02T224906_exp.csv"
     # projectPath = 'testing/testProject'
@@ -111,7 +111,7 @@ if __name__ == '__main__':
     #     projectPath=projectPath,
     #     mode='identifyTraces'
     #     )
-    # # breakpoint()
+    # 
     # fileInventory(
     #     fileID='EP_recalc_2024',
     #     siteID='SCL',
@@ -131,7 +131,7 @@ if __name__ == '__main__':
         projectPath=projectPath,
         mode='identifyTraces'
         )
-    # breakpoint()
+    
     fileInventory(
         fileID='EC_Met',
         siteID='SCL',

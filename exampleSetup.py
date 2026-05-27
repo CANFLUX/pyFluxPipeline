@@ -11,7 +11,8 @@ reset = True
 drive = 'E:'
 if not os.path.isdir(drive):
     drive = 'D:'
-projectPath = f'{drive}/GSC_Work/deltaFluxes'
+# projectPath = f'{drive}/GSC_Work/deltaFluxes'
+projectPath = 'testing/myProject'
 if reset:
     if os.path.exists(projectPath):
         shutil.rmtree(projectPath)
@@ -55,19 +56,32 @@ Flux2024 = rawFile(
     fileFormat='EddyProOutput',
     projectPath=projectPath,
     mode='identifyTraces',
-    ignore=['DOY','daytime','x_peak','x_offset','x_10%','x_30%','x_50%','x_70%','x_90%','daytime','model','amplitude_resolution_hf','drop_out_hf','h2o_def_timelag','co2_def_timelag','ch4_def_timelag','bad_aux_tc1_LI-7700','bad_aux_tc2_LI-7700','bad_aux_tc1_LI-7700']
+    ignore=['DOY','motor_failure_LI-7700','motor_spinning_LI-7700','daytime','x_peak','x_offset','x_10%','x_30%','x_50%','x_70%','x_90%','daytime','model','amplitude_resolution_hf','drop_out_hf','h2o_def_timelag','co2_def_timelag','ch4_def_timelag','bad_aux_tc1_LI-7700','bad_aux_tc2_LI-7700','bad_aux_tc1_LI-7700']
     )
 
-Flux2025 = rawFile(
+Met2025 = rawFile(
     fileName=f"{drive}/data-dump/SCL/2025/20250806/57840_Flux_CSFormat_19.dat",
-    fileID='Flux2025',
+    fileID='Met2025',
     siteID='SCL',
     fileNameMatch='57840_Flux_CSFormat_*.dat',
     fileFormat='TOB3',
     projectPath=projectPath,
     mode='identifyTraces',
-    ignore=['FETCH_MAX','FETCH_90','FETCH_80','FETCH_70','FETCH_FILTER','FETCH_INTRST','FP_FETCH_INTRST','FP_FETCH_INTRST','FP_EQUATION']
+    ignore=['*!','TA_1_1_3','RH_1_1_2','SW_IN']
+    # ignore=['hour_angle','FETCH_MAX','FETCH_90','FETCH_80','FETCH_70','FETCH_FILTER','FETCH_INTRST','FP_FETCH_INTRST','FP_FETCH_INTRST','FP_EQUATION']
 )
+
+
+Flux2025 = rawFile(
+    fileName=f"{drive}/data-dump/SCL/corrected/recalc/eddypro_corrected_full_output_2026-05-24T200126_exp.csv",
+    fileID='Flux2025',
+    siteID='SCL',
+    fileNameMatch='eddypro_corrected_full_output_2026-05-24T200126_exp.csv',
+    fileFormat='EddyProOutput',
+    projectPath=projectPath,
+    mode='identifyTraces',
+    ignore=['DOY','motor_failure_LI-7700','motor_spinning_LI-7700','daytime','x_peak','x_offset','x_10%','x_30%','x_50%','x_70%','x_90%','daytime','model','amplitude_resolution_hf','drop_out_hf','h2o_def_timelag','co2_def_timelag','ch4_def_timelag','bad_aux_tc1_LI-7700','bad_aux_tc2_LI-7700','bad_aux_tc1_LI-7700']
+    )
 
 SSM = rawFile(
     fileName=f"{drive}/data-dump/SCL/2024/20240914/20750528-SHSC.SSM.SGT.240720_240913readout.csv",
@@ -113,13 +127,22 @@ Flux2024 = fileInventory(
     fileFormat=Flux2024.fileFormat,
     projectPath=projectPath).fileSearch(f"{drive}/data-dump/SCL/2024")
 
+
 Flux2025 = fileInventory(
     fileID=Flux2025.fileID,
     siteID=Flux2025.siteID,
     fileFormat=Flux2025.fileFormat,
     projectPath=projectPath)
-Flux2025.fileSearch(f"{drive}/data-dump/SCL/2025")
-Flux2025.fileSearch(f"{drive}/data-dump/SCL/2026")
+Flux2025.fileSearch(f"{drive}/data-dump/SCL/corrected/recalc")
+
+
+Met2025 = fileInventory(
+    fileID=Met2025.fileID,
+    siteID=Met2025.siteID,
+    fileFormat=Met2025.fileFormat,
+    projectPath=projectPath)
+Met2025.fileSearch(f"{drive}/data-dump/SCL/2025")
+Met2025.fileSearch(f"{drive}/data-dump/SCL/2026")
 
 SSM = fileInventory(
     fileID=SSM.fileID,
@@ -139,10 +162,10 @@ WSM.fileSearch(f"{drive}/data-dump/SCL/2025/20250718")
 
 
 NARR_SCL = rawFile(
-    fileName=f"{drive}/data-dump/ncFiles/interpolatedTimeSeries.csv",
+    fileName=f"{drive}/data-dump/ncFiles/deltaClimateSeries.csv",
     fileID='NARR',
     siteID='SCL',
-    fileNameMatch='interpolatedTimeSeries.csv',
+    fileNameMatch='deltaClimateSeries.csv',
     fileFormat='NARRcsv',
     projectPath=projectPath,
     mode='identifyTraces'
@@ -170,68 +193,3 @@ fileInventory(
     siteID=NARR_BSP.siteID,
     fileFormat=NARR_BSP.fileFormat,
     projectPath=projectPath).fileSearch(f"{drive}/data-dump/ncFiles")
-
-
-# firstStage(projectPath=projectPath,sites='SCL',years=[2024,2025])
-
-# # breakpoint()
-# fileInventory(
-#     fileID='EP_recalc_2024',
-#     siteID='SCL',
-#     fileFormat='EddyProOutput',
-#     projectPath=projectPath).fileSearch(root + r'data-dump\SCL\2024')
-
-# # breakpoint()
-
-
-
-# # python -m main --projectPath testing/testProject --sites configurationFiles/SCL_template.yml
-# if __name__ == '__main__':
-#     if os.path.exists('testing/testProject'):
-#         shutil.rmtree('testing/testProject')
-#     current = createProject.from_cmd(safeMode=False)
-#     breakpoint()
-
-#     # current.loadSiteConfiguration()
-#     # print(current.defaultSettings)
-#     # breakpoint()
-
-#     fileName = r"E:\data-dump\SCL\EddyPro\2024\eddypro_t_full_output_2025-05-02T224906_exp.csv"
-#     projectPath = 'testing/testProject'
-
-    # rf = rawFile(
-    #     fileName=fileName,
-    #     fileID='EP_recalc_2024',
-    #     siteID='SCL',
-    #     fileNameMatch='eddypro_t_full_output*.csv',
-    #     fileFormat='EddyProOutput',
-    #     projectPath=projectPath,
-    #     mode='identifyTraces'
-    #     )
-    # # breakpoint()
-    # fileInventory(
-    #     fileID='EP_recalc_2024',
-    #     siteID='SCL',
-    #     fileFormat='EddyProOutput',
-    #     projectPath=projectPath).fileSearch(r'E:\data-dump\SCL\2024')
-
-    
-    # fileName = r"E:\data-dump\SCL\2024\20240912\Met_Data122.dat"
-    # projectPath = 'testing/testProject'
-
-    # rf = rawFile(
-    #     fileName=fileName,
-    #     fileID='EC_Met',
-    #     siteID='SCL',
-    #     fileNameMatch='Met_Data*.dat',
-    #     fileFormat='TOB3',
-    #     projectPath=projectPath,
-    #     mode='identifyTraces'
-    #     )
-    # # breakpoint()
-    # fileInventory(
-    #     fileID='EC_Met',
-    #     siteID='SCL',
-    #     fileFormat='TOB3',
-    #     projectPath=projectPath).fileSearch(r'E:\data-dump\SCL\2024')
-    

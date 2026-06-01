@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler # OneHotEncoder, QuantileTransformer,
 from sklearn.compose import TransformedTargetRegressor
+from sklearn.metrics import r2_score,mean_squared_error,mean_absolute_error
 # from time import time
 # from sklearn.ensemble import RandomForestRegressor
 # from sklearn.inspection import permutation_importance
@@ -24,21 +25,56 @@ class defaultSettings:
     scaleY: bool = True
 
 class ensembleNN(defaultSettings):
+    # Train an ensemble of (single layer default) Dense Feed Forward Neural Networks
+    # Scales data (without using pipeline mode) for increased flexibility and transparency
+    # Trains NN (early stopping using validation set)
+    # Evaluates model to get the test score (mean & 95% CI from ensemble)
+    # From ensemble, calculates mean prediction and 95%CI from variance of estimates
+    # Calculates partial derivatives (using test data) to:
+    #   1. Evaluate feature importance with Sum of Squared Derivatives (and sign)
+    #   2. Map response functions over feature space
+    #   3. Get confidence in response from ensemble mean and CI
+    
     
     def trainEnsemble(self,dataTable,X,y):
         ix = (~dataTable[X+[y]].isna()).all(axis=1) 
         self.Ensemble = {}
-        for i in range(self.nModels):
-            self.model = {}
-            self.seed += i
-            self.trainModel(dataTable.loc[ix,X+[y]],X,y)
-            self.Ensemble[i] = self.model
+        for nth in range(self.nModels):
+            self.nthModel = {}
+            self.seed += nth
+            dataTable[f"{y}_ANN_f_{nth}"] = np.nan
+            dataTable.loc[ix,f"{y}_ANN_f_{nth}"] = self.trainModel(dataTable.loc[ix,X+[y]],X,y)
+            self.Ensemble[nth] = self.nthModel
+        self.evaluateEnsemble(dataTable.loc[ix,X+[y]],X,y)
 
+    def evaluateEnsemble(self,dataTable,X,y):
+        for nth in range(self.nModels):
+            dataTable[X] = self.Ensemble[nth]['X_scaler'].transform(dataTable[X])
+            dataTable[y] = self.Ensemble[nth]['y_scaler'].transform(dataTable[[y]])
+            self.calculateDerivatives(nth,dataTable,X,y)
 
     def trainModel(self,dataTable,X,y):
+        # Split and scale the data for each model
         train,test = self.test_train_split(dataTable,X,y,scale=True)
-        # train,test = self.scaleVariables(train,test,X,y)
-        breakpoint()
+        model = MLPRegressor(
+                hidden_layer_sizes=(self.hiddenLayerShape),
+                learning_rate='adaptive',
+                early_stopping=True,
+                solver='lbfgs',
+                activation=self.activation,
+                verbose=True,
+                n_iter_no_change=2,
+                random_state=self.seed,
+                validation_fraction=self.validate_split,
+                max_iter=500
+            )
+        model.fit(train[X],train[y])
+        test_prediction = model.predict(test[X])
+        self.nthModel['R2'] = r2_score(test[y],test_prediction)
+        self.nthModel['RMSE'] = mean_squared_error(test[y],test_prediction)**.5
+        self.nthModel['MAE'] = mean_absolute_error(test[y],test_prediction)
+        self.nthModel['MLPRegressor'] = model
+        return(model.predict(dataTable[X]))
 
     def test_train_split(self,dataTable,X,y,scale):
         # Split out the test set
@@ -55,29 +91,113 @@ class ensembleNN(defaultSettings):
         
     def scaleVariables(self,train,test,X,y):
         # Scale train[X], test[X] and train[y], test[y] by only the training set
+        # For now just numeric, can add categorical later
         Xs,ys = StandardScaler(),StandardScaler()
         Xs.fit(train[X])
-        ys.fit(train[y])
-        self.model['X_scaler'] = Xs
-        self.model['y_scaler'] = ys
+        ys.fit(train[[y]])
+        self.nthModel['X_scaler'] = Xs
+        self.nthModel['y_scaler'] = ys
         train[X] = Xs.transform(train[X])
         test[X] = Xs.transform(test[X])
-        train[y] = ys.transform(train[y])
-        test[y] = ys.transform(test[y])
+        train[y] = ys.transform(train[[y]])
+        test[y] = ys.transform(test[[y]])
         return(train,test)
 
+    def calculateDerivatives(self,nth,featureSpace,X,y):
+        # Get the model derivatives over the feature space for the nth model in the ensemble
+        model = self.Ensemble[nth]['MLPRegressor']
+        X_values = featureSpace[X].values
+        target = featureSpace[y].values
+        intercepts = model.intercepts_
+        weights = model.coefs_
+        Zeros = np.zeros(intercepts[0].shape)
+        Ones = np.ones(intercepts[0].shape)
+        # Do a "prediction pass" over the feature space
+        # Could replace this with model.predict() instead for performance
+        # For now calculating manually to ensure the math is transparent
+        #   1) Ensure the same answer as the model predict
+        #   2) Gives template for derivative calculations
+        Prediction = []
+        for i in range(X_values.shape[0]):
+            Input = X_values[i]
+            # breakpoint()
+            H1 = ((Input*weights[0].T).sum(axis=1)+intercepts[0])
+            if model.activation == 'relu':
+                H1 = np.maximum(Zeros,H1)
+            elif model.activation == 'logistic':
+                H1 = 1/(1+np.exp(-H1))
+            elif model.activation == 'tanh':
+                H1 = np.tanh(H1)
+            else:
+                exit('Invalid activation')
+            H2 = (H1*weights[1].T).sum()+intercepts[1]
+            Prediction.append(H2)
+        Prediction = np.array(Prediction)
+        # Do a second pass on a per-feature basis to get partial derivatives
+
+        Derivatives = []
+        Sum_Derivatives = []
+        Sum_Squared_Derivatives = []
+
+        for i in range(X_values.shape[1]):
+            dj = []
+            # Loop over inputs per feature
+            for j in range (X_values.shape[0]):
+                Xj = X_values[j,i]
+                H1 = Xj*weights[0][i,:]+intercepts[0]
+                # Calculate the first derivative of the activation function for the per-variable Hidden Layer input
+                if model.activation == 'relu':
+                    H1 = np.maximum(Zeros,H1)
+                    dH1 = H1.copy()
+                    dH1[dH1>0] = 1
+                elif model.activation == 'logistic':
+                    H1 = 1/(1+np.exp(-H1))
+                    dH1 = H1*(1-H1)
+                elif model.activation == 'tanh':
+                    H1 = np.tanh(H1)
+                    dH1 = 1-np.square(H1)
+                else:
+                    exit('Invalid activation')
+                # Derivative of output (a linear function)
+                Sj = 1
+                Sigma = np.array([weights[1][h]*dH1[h]*weights[0][i,h] for h in range(weights[1].shape[0])]).sum()
+                dj.append(Sj*Sigma)
+            dji = np.array(dj)
+            Derivatives.append(dj)
+            Sum_Derivatives.append(np.sum(dji))
+            Sum_Squared_Derivatives.append(np.sum(dji**2))
+
+        Derivatives = np.array(Derivatives)
+        Sum_Derivatives = np.array(Sum_Derivatives)
+        Sum_Squared_Derivatives = np.array(Sum_Squared_Derivatives)
+        self.nthModel['Signed_Feature_Importance'] = np.sign(Sum_Derivatives)*Sum_Squared_Derivatives/Sum_Squared_Derivatives.sum()
+
+        # Scale Derivatives to original units
+        v_X = self.Ensemble[nth]['X_scaler'].var_
+        v_y = self.Ensemble[nth]['y_scaler'].var_
+        Derivatives = Derivatives*(v_y**.5)/(v_X**.5)
+        self.nthModel['Derivatives'] = Derivatives
 
 
-    
-    def y_norm(self,y_values,reverse=False):
-        if not reverse:
-            self.y_mu = y_values.mean()
-            self.y_sigma = y_values.std()
-            y_values = (y_values-self.y_mu)/self.y_sigma
-        else:
-            y_values = y_values*self.y_sigma+self.y_mu
-        return(y_values)
-    
+        Best_ix = np.where(self.nthModel['Signed_Feature_Importance']==self.nthModel['Signed_Feature_Importance'].max())[0][0]
+        Best_x =  X[Best_ix]
+
+        # plt.figure()
+        # plt.scatter(target,Prediction)
+        print(self.Ensemble[nth]['RMSE'])
+        
+        plt.figure()
+        plt.plot(self.Ensemble[nth]['X_scaler'].inverse_transform(X_values),Derivatives[Best_ix])
+
+        plt.figure()
+        plt.plot(self.Ensemble[nth]['X_scaler'].inverse_transform(X_values),self.Ensemble[nth]['y_scaler'].inverse_transform(target.reshape(1,-1)).flatten())
+        plt.plot(self.Ensemble[nth]['X_scaler'].inverse_transform(X_values),self.Ensemble[nth]['y_scaler'].inverse_transform(Prediction.reshape(1,-1)).flatten())
+
+        plt.show()
+        breakpoint()
+
+
+
     
     
     def mlp_model(self,dataTable,X,y):
@@ -147,7 +267,8 @@ class ensembleNN(defaultSettings):
                 H1 = np.maximum(Zeros,H1)
                 # Calculate the derivative of the activation
                 if mx.activation == 'relu':
-                    dH1 = np.maximum(Zeros,H1)
+                    H1 = np.maximum(Zeros,H1)
+                    dH1 = np.zeros(H1.shape)
                     dH1[dH1>0]=1
                 elif mx.activation == 'sigmoid':
                     dH1 = 1/(1+np.exp(-H1))
@@ -193,59 +314,18 @@ class ensembleNN(defaultSettings):
 
 
 
-def MPL_reg(df,X,y,n=5,nl=25,est=None):    
-    Scores = []
-    ds = df[ X + [y]].dropna().copy()
-    # exit()
-    df[f"{y}_pred"] = np.nan
-    df.loc[df[X].notnull().all(axis=1), f"{y}_pred"] = 0
-    if est is not None:
-        est[f"{y}_pred"] = 0
-    # print(X)
-    # print(df.shape,df.loc[df[X].notnull().all(axis=1), X].shape)
-    for seed in range(n):
-        mlp_preprocessor = ColumnTransformer(
-            transformers=[
-                ("num", StandardScaler(), X),
-            ]
-        )
-        train,test = test_train(ds,seed=seed,test_size=0.1)
-        mlp_model = make_pipeline(
-            mlp_preprocessor,
-            MLPRegressor(
-                hidden_layer_sizes=(nl),
-                # learning_rate_init='adaptive',
-                early_stopping=True,
-                solver='lbfgs',
-                activation='relu',
-                verbose=True,
-                n_iter_no_change=2,
-                random_state=seed,
-                max_iter=2000
-            ),
-        )
-        
-        mlp_model.fit(train[X],train[y])
-        mx = mlp_model.named_steps['mlpregressor']
-        print(mx.coefs_,mx.intercepts_)
-        if y.startswith('FCH4'):
-            df.loc[df[X].notnull().all(axis=1), f'{y}_pred'] += mlp_model.predict(df.loc[df[X].notnull().all(axis=1), X])*std_ch4+mean_ch4
-            if est is not None: 
-                est[f'{y}_pred_{seed}'] = mlp_model.predict(est[X])*std_ch4+mean_ch4
-        else:
-            df.loc[df[X].notnull().all(axis=1), f'{y}_pred'] += mlp_model.predict(df.loc[df[X].notnull().all(axis=1), X])*std_co2+mean_co2
-            
-            if est is not None: 
-                est[f'{y}_pred_{seed}'] = mlp_model.predict(est[X])*std_co2+mean_co2
-        # print(f"done in {time() - tic:.3f}s")
-        score = mlp_model.score(test[X],test[y])
-        Scores.append(score)
-    df[f"{y}_pred"] /= n
-    if est is not None:
-        est[f"{y}_pred"] /= n
-    print(f"Test R2 score: {np.median(np.array(Scores)):.2f}")
-    return(df,n,est)
+# dataTable = pd.read_csv(r'C:\Users\jskeeter\gsc-permafrost\pyFluxPipeline\testing\SCL_data.csv',parse_dates=[0],index_col=0)
+# dataTable['Month'] = dataTable.index.month
+# ensembleNN(hiddenLayerShape=(100),activation='relu').trainEnsemble(dataTable,X=['TA_1_1_1','SW_IN_1_1_1','Month'],y='TS_1_1_1')
 
-
-dataTable = pd.read_csv(r'C:\Users\jskeeter\gsc-permafrost\pyFluxPipeline\testing\SCL_data.csv',parse_dates=[0],index_col=0)
-ensembleNN(hiddenLayerShape=(10),activation='tanh').trainEnsemble(dataTable,X=['TA_1_1_1','SW_IN_1_1_1'],y='TS_1_1_1')
+Xar = np.arange(-10,10,1)
+m = 1
+b = 0
+yar = m*Xar+b*np.random.random(Xar.shape)
+yar[yar>0] = yar[yar>0]*2
+data = pd.DataFrame(data={'X':Xar,'y':yar})
+# plt.figure()
+# plt.scatter(data['X'],data['y'])
+# plt.title('Function')
+# breakpoint()
+ensembleNN(hiddenLayerShape=(5),activation='relu').trainEnsemble(data,X=['X'],y='y')

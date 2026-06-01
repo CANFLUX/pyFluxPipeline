@@ -37,21 +37,28 @@ class ensembleNN(defaultSettings):
     
     
     def trainEnsemble(self,dataTable,X,y):
-        ix = (~dataTable[X+[y]].isna()).all(axis=1) 
+        self.ix = (~dataTable[X+[y]].isna()).all(axis=1) 
         self.Ensemble = {}
         for nth in range(self.nModels):
             self.nthModel = {}
             self.seed += nth
             dataTable[f"{y}_ANN_f_{nth}"] = np.nan
-            dataTable.loc[ix,f"{y}_ANN_f_{nth}"] = self.trainModel(dataTable.loc[ix,X+[y]],X,y)
+            dataTable.loc[self.ix,f"{y}_ANN_f_{nth}"] = self.trainModel(dataTable.loc[self.ix,X+[y]],X,y)
             self.Ensemble[nth] = self.nthModel
-        self.evaluateEnsemble(dataTable.loc[ix,X+[y]],X,y)
+        self.evaluateEnsemble(dataTable.loc[self.ix,X+[y]],X,y)
 
     def evaluateEnsemble(self,dataTable,X,y):
+        fig,self.ax = plt.subplots()
+        
+        fig,self.ax2 = plt.subplots()
         for nth in range(self.nModels):
-            dataTable[X] = self.Ensemble[nth]['X_scaler'].transform(dataTable[X])
-            dataTable[y] = self.Ensemble[nth]['y_scaler'].transform(dataTable[[y]])
+            featureSpace = dataTable.copy()
+            featureSpace[X] = self.Ensemble[nth]['X_scaler'].transform(featureSpace[X])
+            featureSpace[y] = self.Ensemble[nth]['y_scaler'].transform(featureSpace[[y]])
             self.calculateDerivatives(nth,dataTable,X,y)
+        self.ax.plot(dataTable[X],dataTable[y],label='target',color='k')
+        self.ax2.plot(dataTable[X],dataTable[y].diff()/dataTable[X[0]].diff(),color='k',label='target')
+        plt.show()
 
     def trainModel(self,dataTable,X,y):
         # Split and scale the data for each model
@@ -171,7 +178,7 @@ class ensembleNN(defaultSettings):
         Sum_Derivatives = np.array(Sum_Derivatives)
         Sum_Squared_Derivatives = np.array(Sum_Squared_Derivatives)
         self.nthModel['Signed_Feature_Importance'] = np.sign(Sum_Derivatives)*Sum_Squared_Derivatives/Sum_Squared_Derivatives.sum()
-
+        breakpoint()
         # Scale Derivatives to original units
         v_X = self.Ensemble[nth]['X_scaler'].var_
         v_y = self.Ensemble[nth]['y_scaler'].var_
@@ -182,150 +189,25 @@ class ensembleNN(defaultSettings):
         Best_ix = np.where(self.nthModel['Signed_Feature_Importance']==self.nthModel['Signed_Feature_Importance'].max())[0][0]
         Best_x =  X[Best_ix]
 
+        
         # plt.figure()
-        # plt.scatter(target,Prediction)
-        print(self.Ensemble[nth]['RMSE'])
-        
-        plt.figure()
-        plt.plot(self.Ensemble[nth]['X_scaler'].inverse_transform(X_values),Derivatives[Best_ix])
+        self.ax2.plot(self.Ensemble[nth]['X_scaler'].inverse_transform(X_values),Derivatives[Best_ix],label=str(nth))
 
-        plt.figure()
-        plt.plot(self.Ensemble[nth]['X_scaler'].inverse_transform(X_values),self.Ensemble[nth]['y_scaler'].inverse_transform(target.reshape(1,-1)).flatten())
-        plt.plot(self.Ensemble[nth]['X_scaler'].inverse_transform(X_values),self.Ensemble[nth]['y_scaler'].inverse_transform(Prediction.reshape(1,-1)).flatten())
-
-        plt.show()
-        breakpoint()
-
-
-
-    
-    
-    def mlp_model(self,dataTable,X,y):
-        train,test = self.test_train_split(dataTable)
-        preprocessor = ColumnTransformer(
-                transformers=[
-                    ("Xscaler", StandardScaler(), X),
-                ]
-            )
-        mlp_model = make_pipeline(
-            preprocessor,
-            MLPRegressor(
-                hidden_layer_sizes=(self.hiddenLayerShape),
-                learning_rate='adaptive',
-                early_stopping=True,
-                solver='lbfgs',
-                activation=self.activation,
-                verbose=True,
-                n_iter_no_change=2,
-                random_state=self.seed,
-                max_iter=500
-            ),
-        )
-        model = TransformedTargetRegressor(
-            regressor=mlp_model,
-            transformer=StandardScaler()
-        )
-        model.fit(train[X],train[y])
-
-        breakpoint()
-        mx = mlp_model.named_steps['mlpregressor']
-        w_intercepts = mx.intercepts_
-        w_weights = mx.coefs_
-        print(mx.coefs_,mx.intercepts_)
-        Output = []
-        X_values = mlp_model.named_steps['columntransformer'].named_transformers_['scaler'].transform(dataTable[X])
-        # Could replace this with model.predict() just doing for now to ensure I understand the math and can get the same answer as the model
-        Zeros = np.zeros(w_intercepts[0].shape)
-        for i in range(X_values.shape[0]):
-            Input = X_values[i]
-            H1 = (((Input*w_weights[0].T)).sum(axis=1)+w_intercepts[0])
-            if mx.activation == 'relu':
-                H1 = np.maximum(Zeros,H1)
-            elif mx.activation == 'sigmoid':
-                H1 = 1/(1+np.exp(-H1))
-            elif mx.activation == 'tanh':
-                H1 = np.tanh(H1)
-            else:
-                breakpoint()
-            H2 = (H1*w_weights[1].T).sum()+w_intercepts[1]
-            Output.append(H2)
-        Output = np.array(Output)
-
-        Target = dataTable[y].values
-
-        # Get the derivatives
-        Derivatives = []
-        Sum_Derivatives = []
-        Sum_Squared_Derivatives = []
-        for i in range(X_values.shape[1]):
-            dj = []
-            for j in range (X_values.shape[0]):
-                t = Target[j]
-                o = Output[j]
-                Xj = X_values[j,i]
-                H1 = Xj*w_weights[0][i,:]+w_intercepts[0]
-                H1 = np.maximum(Zeros,H1)
-                # Calculate the derivative of the activation
-                if mx.activation == 'relu':
-                    H1 = np.maximum(Zeros,H1)
-                    dH1 = np.zeros(H1.shape)
-                    dH1[dH1>0]=1
-                elif mx.activation == 'sigmoid':
-                    dH1 = 1/(1+np.exp(-H1))
-                    dH1 = dH1*(1-H1)
-                elif mx.activation == 'tanh':
-                    dH1 = 1-np.square(np.tanh(H1))
-                else:
-                    breakpoint()
-                # Derivative of output (a linear function)
-                Sj = 1
-                Sigma = np.array([w_weights[1][h]*dH1[h]*w_weights[0][i,h] for h in range(w_weights[1].shape[0])]).sum()
-                dj.append(Sj*Sigma)
-            dji = np.array(dj)
-            Derivatives.append(dj)
-            Sum_Derivatives.append(np.sum(dji))
-            Sum_Squared_Derivatives.append(np.sum(dji**2))
-
-        Derivatives = np.array(Derivatives)
-        Sum_Derivatives = np.array(Sum_Derivatives)
-        Sum_Squared_Derivatives = np.array(Sum_Squared_Derivatives)
-
-        Feature_Importance = Sum_Squared_Derivatives/Sum_Squared_Derivatives.sum()
-        Signed_Importance = np.sign(Sum_Derivatives)
-
-        Best_ix = np.where(Feature_Importance==Feature_Importance.max())[0][0]
-        Best_x =  X[Best_ix]
-
-        plt.figure()
-        plt.scatter(Output,mlp_model.predict(dataTable[X]))
-
-        plt.figure()
-        plt.barh(X,Feature_Importance)
-        
-        print(Sum_Squared_Derivatives)
-        plt.figure()
-        plt.scatter(dataTable[X[Best_ix]],Derivatives[Best_ix])
-
-        plt.show()
-        breakpoint()
-
-    
-
-
+        # plt.figure()
+        self.ax.plot(self.Ensemble[nth]['X_scaler'].inverse_transform(X_values),self.Ensemble[nth]['y_scaler'].inverse_transform(Prediction.reshape(1,-1)).flatten(),label='Prediction')
+        # plt.legend()
 
 
 # dataTable = pd.read_csv(r'C:\Users\jskeeter\gsc-permafrost\pyFluxPipeline\testing\SCL_data.csv',parse_dates=[0],index_col=0)
 # dataTable['Month'] = dataTable.index.month
 # ensembleNN(hiddenLayerShape=(100),activation='relu').trainEnsemble(dataTable,X=['TA_1_1_1','SW_IN_1_1_1','Month'],y='TS_1_1_1')
 
-Xar = np.arange(-10,10,1)
+Xar = np.arange(-10,10,.1)
 m = 1
 b = 0
 yar = m*Xar+b*np.random.random(Xar.shape)
 yar[yar>0] = yar[yar>0]*2
 data = pd.DataFrame(data={'X':Xar,'y':yar})
-# plt.figure()
-# plt.scatter(data['X'],data['y'])
-# plt.title('Function')
+eNN = ensembleNN(hiddenLayerShape=(10),activation='relu').trainEnsemble(data,X=['X'],y='y')
+
 # breakpoint()
-ensembleNN(hiddenLayerShape=(5),activation='relu').trainEnsemble(data,X=['X'],y='y')

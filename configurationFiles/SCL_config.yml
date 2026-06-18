@@ -15,14 +15,14 @@ rawData:
     rawData["Flux2025.co2_signal_mean"] *= 100
     rawData["Flux2025.h2o_signal_mean"] *= 100
     # 15 degree missalignment in record (incorrect declination used originally)
-    offset = -24.5
-    rawData["Flux2024.wind_dir"] = rawData["Flux2024.wind_dir"]+offset
-    rawData.loc[rawData["Flux2024.wind_dir"]>360,"Flux2024.wind_dir"] -= 360
-    rawData.loc[rawData["Flux2024.wind_dir"]<0,"Flux2024.wind_dir"] += 360
-    rawData["Flux2025.wind_dir"] = rawData["Flux2025.wind_dir"]+offset
-    rawData.loc[rawData["Flux2025.wind_dir"]>360,"Flux2025.wind_dir"] -= 360
-    rawData.loc[rawData["Flux2025.wind_dir"]<0,"Flux2025.wind_dir"] += 360
-    bearing = 8.5
+    # offset = -24.5
+    # rawData["Flux2024.wind_dir"] = rawData["Flux2024.wind_dir"]+offset
+    # rawData.loc[rawData["Flux2024.wind_dir"]>360,"Flux2024.wind_dir"] -= 360
+    # rawData.loc[rawData["Flux2024.wind_dir"]<0,"Flux2024.wind_dir"] += 360
+    # rawData["Flux2025.wind_dir"] = rawData["Flux2025.wind_dir"]+offset
+    # rawData.loc[rawData["Flux2025.wind_dir"]>360,"Flux2025.wind_dir"] -= 360
+    # rawData.loc[rawData["Flux2025.wind_dir"]<0,"Flux2025.wind_dir"] += 360
+    bearing = 33
     rawData["Flux2024.wind_dir_flag"] = rawData["Flux2024.wind_dir"].copy()
     rawData.loc[((rawData["Flux2024.wind_dir_flag"]<bearing+180+30)&(rawData["Flux2024.wind_dir_flag"]>bearing+180-30)),"Flux2024.wind_dir_flag"] = np.nan
     rawData["Flux2025.wind_dir_flag"] = rawData["Flux2025.wind_dir"].copy()
@@ -38,10 +38,10 @@ rawData:
   - '2024-09-13T00:30:00+00:00'
   Met2025: &Met2025.inputDates
   - '2025-06-05T23:00:00+00:00'
-  - '2026-04-11T00:00:00+00:00'
+  - '2026-06-11T00:00:00+00:00'
   Flux2025: &Flux2025.inputDates
   - '2025-08-03T03:00:00+00:00'
-  - '2025-09-27T18:00:00+00:00'
+  - '2026-06-11T00:00:00+00:00'
   SSM_TS: &SSM_TS.inputDates
   - '2024-07-20T21:00:00+00:00'
   - '2025-07-18T16:00:00+00:00'
@@ -190,6 +190,11 @@ Processing:
       - H_QC
       - ustar_filter
       - wind_dir_flag
+    H_csi:
+      variableName: H_csi
+      units: W m-2
+      inputFiles:
+        Met2025.H: *Met2025.inputDates
     H_QC:
       variableName: H_QC
       units: arb
@@ -219,18 +224,37 @@ Processing:
       minMax:
       - 0
       - 1
+    H2O_mole_fraction:
+      variableName: H2O_mole_fraction
+      units: umol mol-1
+      inputFiles:
+        Flux2024.h2o_mole_fraction: *Flux2024.inputDates
+        Flux2025.h2o_mole_fraction: *Flux2025.inputDates
     H2O_signal:
       variableName: H2O_signal
       units: umol mol-1
       inputFiles:
         Flux2024.h2o_signal_mean: *Flux2024.inputDates
         Flux2025.h2o_signal_mean: *Flux2025.inputDates
-    FCOC2:
+    FCO2:
       variableName: FCO2
       units: umol m-2 s-1
       inputFiles:
         Flux2024.co2_flux: *Flux2024.inputDates
         Flux2025.co2_flux: *Flux2025.inputDates
+      minMax:
+      - -15
+      - 5
+      dependent:
+      - FCO2_QC
+      - CO2_signal
+      - ustar_filter
+      - wind_dir_flag
+    FCO2_csi:
+      variableName: FCO2_csi
+      units: mg m-2 s-1
+      inputFiles:
+        Met2025.FC_mass: *Met2025.inputDates
       minMax:
       - -15
       - 5
@@ -248,6 +272,12 @@ Processing:
       minMax:
       - 0
       - 1
+    CO2_mole_fraction:
+      variableName: CO2_mole_fraction
+      units: umol mol-1
+      inputFiles:
+        Flux2024.co2_mole_fraction: *Flux2024.inputDates
+        Flux2025.co2_mole_fraction: *Flux2025.inputDates
     CO2_signal:
       variableName: CO2_signal
       units: umol mol-1
@@ -280,6 +310,12 @@ Processing:
       minMax:
       - 0
       - 1
+    CH4_mole_fraction:
+      variableName: CH4_mole_fraction
+      units: umol mol-1
+      inputFiles:
+        Flux2024.ch4_mole_fraction: *Flux2024.inputDates
+        Flux2025.ch4_mole_fraction: *Flux2025.inputDates
     CH4_signal:
       variableName: CH4_signal
       units: umol mol-1
@@ -394,11 +430,19 @@ Processing:
     H:
       variableName: H
       units: W m-2
+    H_csi:
+      variableName: H_csi
+      units: umol m-2 s-1
     LE:
       variableName: LE
       units: W m-2
     FCO2:
       variableName: FCO2
+      units: umol m-2 s-1
+    FCO2_csi:
+      Evaluate: |
+        dataTable['FCO2_csi'] = dataTable['FCO2_csi'] /12.01*1e3
+      variableName: FCO2_csi
       units: umol m-2 s-1
     FCH4:
       variableName: FCH4

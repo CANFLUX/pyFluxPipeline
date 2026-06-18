@@ -67,16 +67,16 @@ Met2025 = rawFile(
     fileFormat='TOB3',
     projectPath=projectPath,
     mode='identifyTraces',
-    ignore=['*!','TA_1_1_3','RH_1_1_2','SW_IN']
+    ignore=['*!','TA_1_1_3','RH_1_1_2','SW_IN','FC_mass','H']
     # ignore=['hour_angle','FETCH_MAX','FETCH_90','FETCH_80','FETCH_70','FETCH_FILTER','FETCH_INTRST','FP_FETCH_INTRST','FP_FETCH_INTRST','FP_EQUATION']
 )
 
 
 Flux2025 = rawFile(
-    fileName=f"{drive}/data-dump/SCL/corrected/recalc/eddypro_corrected_full_output_2026-05-24T200126_exp.csv",
+    fileName=f"{drive}/data-dump/SCL/corrected/recalc/eddypro_corrected_v4_full_output_2026-06-14T195313_exp.csv",
     fileID='Flux2025',
     siteID='SCL',
-    fileNameMatch='eddypro_corrected_full_output_2026-05-24T200126_exp.csv',
+    fileNameMatch='eddypro_corrected_v4_full_output*.csv',
     fileFormat='EddyProOutput',
     projectPath=projectPath,
     mode='identifyTraces',
@@ -134,6 +134,7 @@ Flux2025 = fileInventory(
     fileFormat=Flux2025.fileFormat,
     projectPath=projectPath)
 Flux2025.fileSearch(f"{drive}/data-dump/SCL/corrected/recalc")
+# breakpoint()
 
 
 Met2025 = fileInventory(

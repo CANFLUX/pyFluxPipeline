@@ -27,6 +27,7 @@ class configTemplate:
 @dataclass(kw_only=True)
 class siteConfiguration(project):
     siteID: str = field(metadata = mdMap('Unique siteID code'))
+    siteName: str = field(metadata = mdMap('Long-format name'))
     startDate: datetime = field(metadata = mdMap('Start Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
     stopDate: datetime = field(default = None,metadata = mdMap('Stop Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
     siteName: str = field(default = None,metadata = mdMap('Name of the Site'))
@@ -58,6 +59,7 @@ class siteConfiguration(project):
             params = self.sensors.pop(id)
             params = sensor.from_dict(params)
             self.sensors[params.hardwareID] = params
+
     
     def loadIni(self):
         self.iniPath = os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini',f"{self.siteID}_config.yml")

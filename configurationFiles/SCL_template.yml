@@ -1,4 +1,5 @@
 siteID: SCL
+siteName: Swiss Cheese Lake
 lat_lon: [69.2264167, -135.2519067]
 startDate: &V1_dateIn 2024-07-10T00:00:00
 dataLoggers:
@@ -46,7 +47,7 @@ sensors:
     sensorType: irga
     northOffset: *V1_northOffset
     xSeparation: 0.23
-    ySeparation: -0.14
+    ySeparation: 0.14
     verticalSeparation: 0
   IRGASON:
     modelName: IRGASON
@@ -61,9 +62,9 @@ sensors:
     dateIn: *V2_dateIn
     sensorType: irga
     northOffset: *V1_northOffset
-    xSeparation: -0.41
-    ySeparation: -0.16
-    verticalSeparation: 0
+    xSeparation: 0.45
+    ySeparation: 0.13
+    verticalSeparation: -0.04
   TC1:
     modelName: TC
     serialNumber: SSM

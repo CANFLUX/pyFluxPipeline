@@ -85,6 +85,7 @@ class sensorPosition():
         Rv = Rv.sum(axis=1).round(3)
         self.northwardSeparation = float(Rv[1])
         self.eastwardSeparation = float(Rv[0])
+        # breakpoint()
         # return(northwardSeparation,eastwardSeparation)
     
     def cartesianSeparation(self,tolerance=0.01):

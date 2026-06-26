@@ -1,6 +1,7 @@
 # from scripts.rawFileProcessing.fileInventory import fileInventory
-# from scripts.rawFileProcessing.rawFile import rawFile
+from scripts.rawFileProcessing.rawFile import rawFile
 # from scripts.traceAnalysis.firstStage import firstStage
+from scripts.rawFileProcessing.parseCSI import discoverCSI
 from scripts.newProject import createProject
 from scripts.siteConfiguration import siteConfiguration
 import shutil
@@ -9,7 +10,7 @@ from scripts.ecf32.ecf32 import ecf32
 from scripts.database.database import database
 
 
-reset = False
+reset = True
 
 drive = 'E:'
 if not os.path.isdir(drive):
@@ -28,7 +29,7 @@ if not os.path.isdir(projectPath):
         # 'ILL'
         ])
     
-
-ecf32(projectPath=projectPath).make('SCL')
+SeepFlux = discoverCSI('/mnt/d/data-dump/RDEC1/20260614')
+# ecf32(projectPath=projectPath).make('SEEP')
 
 

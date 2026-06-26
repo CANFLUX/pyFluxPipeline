@@ -26,11 +26,13 @@ class defaultSettings(project):
 class database(defaultSettings):
 
     projectPath: str = field(repr=False,metadata=mdMap('Root path of the current project'))
-    sites: list = field(default_factory=list)
+    sites: list = field(default_factory=list,repr=False)
     # siteInventory: dict = field(init=False,default_factory=dict,repr=False)
 
     def __post_init__(self):  
         super().__post_init__()
+        if self.projectPath is None:
+            return
         self.databasePath = os.path.join(self.projectPath,'Database')
         if self.sites == []:
             self.sites = [pth for pth in os.listdir(os.path.join(self.projectPath,'Sites'))]

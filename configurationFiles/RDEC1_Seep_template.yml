@@ -1,4 +1,4 @@
-siteID: RDEC1
+siteID: SEEP
 lat_lon: [69.319508, -135.478002]
 startDate: &V1_dateIn 2026-06-11T00:00:00
 endDate: &V1_dateOut 2026-08-05T00:00:00

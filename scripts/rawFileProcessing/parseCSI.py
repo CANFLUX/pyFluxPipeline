@@ -15,10 +15,6 @@ import os
 
 @dataclass(kw_only=True)
 class csiTable(sharedFields):
-    stationName: str = field(default=None,init=False,repr=False)
-    loggerModel: str = field(default=None,init=False,repr=False)
-    serialNumber: str = field(default=None,init=False,repr=False)
-    program: str = field(default=None,init=False,repr=False)
     campbellBaseTime = 631152000.0      
             
     def parseHeader(self,fileObject):
@@ -41,6 +37,7 @@ class csiTable(sharedFields):
             self.dataTable.index -= Offset
             if self.verbose:
                 self.logMessage(f"Total GPS induced offset in {self.fileName} is {Offset.iloc[-1]}s",verbose=False)
+
 class TOA5(csiTable):
 
     def readTOA5(self):
@@ -74,7 +71,10 @@ class TOB3(csiTable):
             self.fileTimestamp = pd.to_datetime(self.header[0][-1])
             self.tableName = self.header[1][0]
             self.dataIntervalSeconds = pd.to_timedelta(parseFrequency(self.header[1][1])).total_seconds()
-            self.dataFrequencyHertz = (1.0 / self.dataIntervalSeconds)
+            if self.dataIntervalSeconds <= 0:
+                self.dataFrequencyHertz = np.nan
+            else:
+                self.dataFrequencyHertz = (1.0 / self.dataIntervalSeconds)
             self.frameSize = int(self.header[1][2])
             self.tableSize = int(self.header[1][3])
             self.validationStamp = int(self.header[1][4])
@@ -321,3 +321,23 @@ class MixedArray(csiTable):
         typeMap = {var['originalVariable']:var['dtype'] for var in self.traces.values()}
         self.dataTable = self.dataTable.astype(typeMap)
         # self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)
+
+
+class discoverCSI:
+
+    def __init__(self,dpath):
+        dat = {f:self.getType(dpath,f) for f in os.listdir(dpath) if f.endswith('.dat')}
+        print(dat)
+        breakpoint()
+
+    def getType(self,fpath,fname):
+        if fname.startswith('TOA5'):
+            breakpoint()
+        else:
+            fpath = os.path.join(fpath,fname)
+            out = TOB3(fileName=fpath,projectPath=None)
+            out.readTOB3()
+            # metadata = {key:out.__getattribute__(key) for key in csiTable.__annotations__.keys()}
+            breakpoint()
+
+        return(metadata)

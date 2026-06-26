@@ -23,7 +23,6 @@ class createProject(database):
     def newProject(self):
         os.makedirs(os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini'))
         os.makedirs(os.path.join(self.projectPath,'Sites'))
-        self.saveConfigFile(os.path.join(self.projectPath,'projectConfig.yml'))
         replaceMap = {}
         if isinstance(self.sites,str):
             self.sites = [self.sites]
@@ -32,6 +31,7 @@ class createProject(database):
             replaceMap[i],_ = self.newSite(siteID)
         for i,v in replaceMap.items():
             self.sites[i] = v
+        self.saveConfigFile(os.path.join(self.projectPath,'projectConfig.yml'))
 
     def newSite(self,siteID):
         if isinstance(siteID,str):

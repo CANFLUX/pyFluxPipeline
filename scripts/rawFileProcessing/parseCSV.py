@@ -13,13 +13,16 @@ import re
 class csvFile(sharedFields):
     labelColumnBy = 'name'
     delimiter = ','
+    
 
-    def open_csv_file(self):
-        rawFile = open(self.fileName,'r')
-            
+    def open_csv_file(self,mode='r'):
+        rawFile = open(self.fileName,mode)
         self.preamble = []
         for i in range(self.skipRows):
-            self.preamble.append(''.join(rawFile.readline().rstrip('\n').split(self.delimiter)))
+            if mode == 'r':
+                self.preamble.append(''.join(rawFile.readline().rstrip('\n').split(self.delimiter)))         
+            else:
+                self.preamble.append(''.join(rawFile.readline().decode('ascii',errors='ignore').rstrip('\n').split(self.delimiter)))         
         self.preamble = '\n'.join(self.preamble)
         # # some files (eg. hoboCSV) have less than tidy formatting in their headers
         def delimSub(text,subText):
@@ -35,7 +38,11 @@ class csvFile(sharedFields):
         # parse the header to a list (only if not user provided, otherwise just skip)
         self.header = []
         for i in range(self.headerRows):
-            HL = cleanString(rawFile.readline(),replace={'\n':''},permit={'°','µ'})
+            if mode == 'r':
+                Lx = rawFile.readline()
+            else:
+                Lx = rawFile.readline().decode('ascii',errors='ignore')
+            HL = cleanString(Lx,replace={'\n':''},permit={'°','µ'})
             subText ='THISISADELIMTERITDOESNTBELONGHERE'
             HL = delimSub(HL,subText)
             HL = [format(h) for h in HL.split(self.delimiter)]
@@ -99,7 +106,10 @@ class HOBOcsv(csvFile):
         self.skipRows = 1
         self.headerRows = 1
         self.labelColumnBy = 'index'
-        self.open_csv_file()
+        try:
+            self.open_csv_file()
+        except:
+            self.open_csv_file(mode='rb')
         if self.traces == {}:
             self.traces = {i:rawTrace.from_dict({'originalVariable':key.replace('#','record_number'),'dtype':self.typeMap[i]}).to_dict() for i,key in enumerate(self.header[0])}
         # ignore record

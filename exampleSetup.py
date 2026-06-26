@@ -10,7 +10,7 @@ reset = True
 
 drive = 'E:'
 if not os.path.isdir(drive):
-    drive = 'D:'
+    drive = '/mnt/d'
 # projectPath = f'{drive}/GSC_Work/deltaFluxes'
 projectPath = 'testing/myProject'
 if reset:
@@ -24,7 +24,6 @@ if not os.path.isdir(projectPath):
         'FIL', # Generic template for site FIL and ILL
         'ILL'
         ])
-
 
 # inspect the traces in raw files
 Met2024 = rawFile(

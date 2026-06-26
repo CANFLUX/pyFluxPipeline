@@ -7,9 +7,11 @@ from helperFunctions.baseClass import mdMap
 from scripts.traceAnalysis.traceParameters import rawTrace
 from scripts.rawFileProcessing.sharedFields import sharedFields
 from datetime import datetime
+from scripts.database.database import database
 import pandas as pd
 import numpy as np
 import struct
+import json
 import re
 import os
 
@@ -323,12 +325,26 @@ class MixedArray(csiTable):
         # self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)
 
 
-class discoverCSI:
+@dataclass(kw_only=True)
+class discoverCSI(database):
+    siteID: str
+    searchPath: str
 
-    def __init__(self,dpath):
-        dat = {f:self.getType(dpath,f) for f in os.listdir(dpath) if f.endswith('.dat')}
-        print(dat)
+    def __post_init__(self):
+        super().__post_init__()
+        self.traces = {}
+        files = pd.DataFrame(
+            {f:self.getType(self.searchPath,f) for f in os.listdir(self.searchPath) if f.endswith('.dat')}
+        ).T
+        files = files.sort_values(by=['tableName','fileTimestamp'])
+        test = [c for c in files.columns if c not in ['fileTimestamp']]
+        files['referenceFile'] = ~files[test].duplicated()*files.index
+        files['referenceFile'] = files['referenceFile'].replace('',np.nan).ffill()
+        fileSets = files.groupby('referenceFile').first()
+        files = files[['fileTimestamp','referenceFile']].copy()
         breakpoint()
+
+
 
     def getType(self,fpath,fname):
         if fname.startswith('TOA5'):
@@ -337,7 +353,8 @@ class discoverCSI:
             fpath = os.path.join(fpath,fname)
             out = TOB3(fileName=fpath,projectPath=None)
             out.readTOB3()
-            # metadata = {key:out.__getattribute__(key) for key in csiTable.__annotations__.keys()}
-            breakpoint()
+            out = out.to_dict()
+            self.traces[fname] = out.pop('traces')
+            out['traces'] = json.dumps(self.traces[fname])
 
-        return(metadata)
+        return(out)

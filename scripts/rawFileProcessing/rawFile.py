@@ -16,7 +16,7 @@ class rawFile(TOB3,TOA5,EddyProOutput,HOBOcsv,MixedArray,NARRcsv):
     fileID: str
     dateRange: list = field(default_factory=lambda:[None,None])
     dataIntervalSeconds: float = None
-    traces: dict = field(default_factory=dict)
+    # traces: dict = field(default_factory=dict)
     # mapIniTemplate: bool = True
     searchDir: str = field(default=None,repr=False)
     fileInventory: dict = field(default_factory=dict,repr=False)

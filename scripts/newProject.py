@@ -8,7 +8,7 @@ import os
 @dataclass(kw_only=True)
 class createProject(database):
     projectPath: str = field(metadata=mdMap('Root path of the current project'))
-    sites: list = field(default_factory=lambda:['.templateSite'],metadata=mdMap('List of siteIDs'))
+    sitesList: list = field(default_factory=lambda:['.templateSite'],metadata=mdMap('List of siteIDs'))
     # siteConfigTemplates: dict = field(default_factory=dict,repr=False)
     
     def __post_init__(self):
@@ -24,13 +24,13 @@ class createProject(database):
         os.makedirs(os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini'))
         os.makedirs(os.path.join(self.projectPath,'Sites'))
         replaceMap = {}
-        if isinstance(self.sites,str):
-            self.sites = [self.sites]
-        for i,siteID in enumerate(self.sites):
+        if isinstance(self.sitesList,str):
+            self.sitesList = [self.sitesList]
+        for i,siteID in enumerate(self.sitesList):
             # Load user provided template file
             replaceMap[i],_ = self.newSite(siteID)
         for i,v in replaceMap.items():
-            self.sites[i] = v
+            self.sitesList[i] = v
         self.saveConfigFile(os.path.join(self.projectPath,'projectConfig.yml'))
 
     def newSite(self,siteID):

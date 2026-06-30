@@ -17,7 +17,7 @@ if reset:
     if os.path.exists(projectPath):
         shutil.rmtree(projectPath)
 if not os.path.isdir(projectPath):
-    createProject(projectPath=projectPath,sites=[
+    createProject(projectPath=projectPath,sitesList=[
         'configurationFiles/SCL_template.yml', # Template from preexisting metadata file for SCL
         'configurationFiles/RDEC1_Seep_template.yml', # Template from preexisting metadata file for RDEC1
         {'siteID': 'BSP','lat_lon': [69.319431, -135.478286],'startDate':'2026-06-01'}, # Template from dict for BSP

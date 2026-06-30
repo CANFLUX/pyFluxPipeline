@@ -13,7 +13,7 @@ class firstStage(database):
 
     def __post_init__(self):
         super().__post_init__()
-        for siteID in self.sites:
+        for siteID in self.sitesList:
             T1 = time()
             # load site configuration
             siteConfig = self.loadSiteConfiguration(siteID)

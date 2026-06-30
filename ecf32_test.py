@@ -7,21 +7,21 @@ from scripts.siteConfiguration import siteConfiguration
 import shutil
 import os
 from scripts.ecf32.ecf32 import ecf32
-from scripts.database.database import database
+from scripts.database.database import highFrequencyDatabase
 
 
-reset = True
+reset = False
 
-drive = 'E:'
-if not os.path.isdir(drive):
-    drive = 'D:'
+# drive = 'E:'
+# if not os.path.isdir(drive):
+#     drive = 'D:'
 # projectPath = f'{drive}/GSC_Work/deltaFluxes'
 projectPath = 'testing/myProject'
 if reset:
     if os.path.exists(projectPath):
         shutil.rmtree(projectPath)
 if not os.path.isdir(projectPath):
-    createProject(projectPath=projectPath,sites=[
+    createProject(projectPath=projectPath,sitesList=[
         # 'configurationFiles/SCL_template.yml', # Template from preexisting metadata file for SCL
         'configurationFiles/RDEC1_Seep_template.yml', # Template from preexisting metadata file for RDEC1
         # {'siteID': 'BSP','lat_lon': [69.319431, -135.478286],'startDate':'2026-06-01'}, # Template from dict for BSP
@@ -29,12 +29,14 @@ if not os.path.isdir(projectPath):
         # 'ILL'
         ])
     
-SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/d/data-dump/RDEC1/20260614')#,ignoreTables='AmeriFluxFormat')
+# SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/d/data-dump/RDEC1/20260614')#,ignoreTables='AmeriFluxFormat')
 # breakpoint()
-SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/d/data-dump/RDEC1/20260615')#,ignoreTables='AmeriFluxFormat')
-
+# SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/e/data-dump/RDEC1/20260615')#,ignoreTables='AmeriFluxFormat')
+# breakpoint()
 SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',processFiles=True)
 
 # ecf32(projectPath=projectPath).make('SEEP')
+
+
 
 

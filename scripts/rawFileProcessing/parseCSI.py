@@ -7,7 +7,7 @@ from helperFunctions.baseClass import mdMap
 from scripts.traceAnalysis.traceParameters import rawTrace
 from scripts.rawFileProcessing.sharedFields import sharedFields
 from datetime import datetime
-from scripts.database.database import database
+from scripts.database.database import highFrequencyDatabase
 import pandas as pd
 import numpy as np
 import struct
@@ -65,10 +65,6 @@ class TOB3(csiTable):
             self.fileTimestamp = pd.to_datetime(self.header[0][-1])
             self.tableName = self.header[1][0]
             self.dataIntervalSeconds = pd.to_timedelta(parseFrequency(self.header[1][1])).total_seconds()
-            if self.dataIntervalSeconds <= 0:
-                self.dataFrequencyHertz = np.nan
-            else:
-                self.dataFrequencyHertz = (1.0 / self.dataIntervalSeconds)
             self.frameSize = int(self.header[1][2])
             self.tableSize = int(self.header[1][3])
             self.validationStamp = int(self.header[1][4])
@@ -325,7 +321,7 @@ class MixedArray(csiTable):
 
 
 @dataclass(kw_only=True)
-class discoverCSI(database):
+class discoverCSI(highFrequencyDatabase):
     siteID: str
     searchPath: str = None
     processFiles: bool = False
@@ -406,8 +402,7 @@ class discoverCSI(database):
                 if tbx.saveAs == 'dbBinary':
                     self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['tableName']),cfg['dataIntervalSeconds'])
                 elif tbx.saveAs == 'ecf32':
-                    tbx.splitTable()
-
+                    self.ecf32Write(tbx.dataTable,cfg['traces'],cfg['dataIntervalSeconds'],self.siteID,cfg['tableName'])
         breakpoint()
 
     def getType(self,fpath):
@@ -418,5 +413,4 @@ class discoverCSI(database):
             out.readTOB3()
             out = out.to_dict()
             out['traces'] = json.dumps(out['traces'])
-
         return(out)

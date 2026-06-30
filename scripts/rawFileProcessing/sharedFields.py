@@ -132,10 +132,3 @@ class sharedFields(superFormat):
         #         max(self.dateRange[1],self.dataTable.index.max()).isoformat()
         #     ]
         # self.saveConfigFile(self.fileConfigPath)
-
-    def splitTable(self,on='30min'):
-        self.dataTable['fIndex'] = self.dataTable.index.floor('30min')
-        for fIndex in self.dataTable['fIndex'].unique():
-            print(self.dataTable.loc[self.dataTable['fIndex']==fIndex].shape)
-
-        breakpoint()

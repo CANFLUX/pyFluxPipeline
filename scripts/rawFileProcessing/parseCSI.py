@@ -32,13 +32,6 @@ class csiTable(sharedFields):
         self.serialNumber=self.header[0][3]
         self.program=self.header[0][5]
 
-    def finishTable(self):
-        if hasattr(self,'gpsDriftCorrection') and self.gpsDriftCorrection:
-            # Identify gaps in time series
-            Offset = (self.dataTable.index.diff().fillna(self.dataIntervalSeconds)-self.dataIntervalSeconds).cumsum()
-            self.dataTable.index -= Offset
-            if self.verbose:
-                self.logMessage(f"Total GPS induced offset in {self.fileName} is {Offset.iloc[-1]}s",verbose=False)
 
 class TOA5(csiTable):
 
@@ -56,7 +49,6 @@ class TOA5(csiTable):
         if self.traces == {}:
             typeMap = self.dataTable.dtypes
             self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable]).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
-        self.finishTable()
 
 class TOB3(csiTable):
 
@@ -141,15 +133,22 @@ class TOB3(csiTable):
         )
         if self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated().sum():
             self.logWarning(f"Duplicated timestamps found in {self.fileName} at\n{self.indexTraces[self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)]}\n Replicated indices will be offset by 1ns*(counter) to avoid conflicts")
-            ix = self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated()
+            ix = self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)
             rix = self.indexTraces.loc[ix,'RECORD'].astype('int32')
             self.indexTraces.loc[ix,'NANOSECONDS'] += (rix-(rix.min()+1))
-            if self.dataIntervalSeconds<1:
+            if self.dataIntervalSeconds<1 and self.dataIntervalSeconds > 0:
                 self.logError('develop better approach?')
-
-        self.dataTable = dataTable[list(tracesIn.keys())].astype(
-            {key:var['dtype'] for key,var in tracesIn.items()}
-        )
+        try:
+            self.dataTable = dataTable[list(tracesIn.keys())].astype(
+                {key:var['dtype'] for key,var in tracesIn.items()}
+            )
+        except Exception as e:
+            self.logWarning(f'Dtype enforcment failed with error: {e}')
+            self.logMessage('Proceeding with errors = ignore')
+            self.dataTable = dataTable[list(tracesIn.keys())].astype(
+                {key:var['dtype'] for key,var in tracesIn.items()},
+                errors='ignore'
+            )
         self.dataTable.index=pd.to_datetime((self.indexTraces['POSIX_Time']*1e9).astype('int64')+self.indexTraces['NANOSECONDS'],unit='ns') 
     
     def decodeFrame(self,frame):
@@ -328,33 +327,96 @@ class MixedArray(csiTable):
 @dataclass(kw_only=True)
 class discoverCSI(database):
     siteID: str
-    searchPath: str
+    searchPath: str = None
+    processFiles: bool = False
+    ignoreTables: list = field(default_factory=list)
 
     def __post_init__(self):
         super().__post_init__()
-        self.traces = {}
-        files = pd.DataFrame(
-            {f:self.getType(self.searchPath,f) for f in os.listdir(self.searchPath) if f.endswith('.dat')}
-        ).T
-        files = files.sort_values(by=['tableName','fileTimestamp'])
-        test = [c for c in files.columns if c not in ['fileTimestamp']]
-        files['referenceFile'] = ~files[test].duplicated()*files.index
-        files['referenceFile'] = files['referenceFile'].replace('',np.nan).ffill()
-        fileSets = files.groupby('referenceFile').first()
-        files = files[['fileTimestamp','referenceFile']].copy()
+        self.metaPath = os.path.join(self.projectPath,'Sites',self.siteID,'CSI_files')
+        fileInventoryPath = os.path.join(self.metaPath,'.inventory','fileInventory.json')
+        fileSetPath = os.path.join(self.metaPath,'.inventory','fileSets.json')
+
+        if os.path.isfile(fileInventoryPath):
+            self.inventory = self.loadDict(fileInventoryPath)
+            self.fileSets = pd.read_json(fileSetPath)
+            self.inList = [f for v in self.inventory.values() for f in v]
+        else:
+            os.makedirs(os.path.join(self.metaPath,'.inventory'),exist_ok=True)
+            self.inventory = {}
+            self.fileSets = pd.DataFrame()
+            self.inList = []
+            
+        if self.searchPath is not None:
+            self.updateInventory()
+            for configFile,row in self.fileSets.iterrows():
+                row = row.to_dict()
+                row['traces'] = json.loads(row['traces'])
+                self.saveDict(row,os.path.join(self.metaPath,configFile))
+            with open(fileInventoryPath,'w+') as fout:
+                json.dump(self.inventory,fout)
+            self.fileSets.to_json(fileSetPath)
+        
+        if self.processFiles:
+            self.upload()
+
+    def updateInventory(self):
+        files = self.discovery()
+        # Group by common configuration
+        self.fileSets = files.groupby('configFile').first()
+        files['processed'] = False
+        files = files[['configFile','fileName','processed']].groupby('configFile').agg(list).to_dict(orient='index')
+        for key,value in files.items():
+            if key not in self.inventory:
+                self.inventory[key] = value
+            else:
+                self.inventory[key]['processed'] += [False for v in value['fileName'] if v not in self.inventory[key]]
+                self.inventory[key]['fileName'] += [v for v in value['fileName'] if v not in self.inventory[key]]
+            
+    def discovery(self):
+        fileList = [os.path.join(self.searchPath,f) for f in os.listdir(self.searchPath) if f.endswith('.dat') and os.path.join(self.searchPath,f) not in self.inList]
+        # Discover files
+        files = pd.DataFrame({f:self.getType(f) for f in fileList}).T
+        # Remove unwated tables
+        files = files.loc[~files['tableName'].isin(self.ignoreTables)].copy()
+        files['fileName'] = files.index
+        files['referenceFile'] = files['fileName']
+        files = pd.concat([self.fileSets,files])
+        files['fileTimestamp'] = pd.to_datetime(files['fileTimestamp'])
+        files = files.sort_values(by=['tableName','traces','fileTimestamp'])
+        # It only matters if these columns are duplicated
+        test = ['tableName','loggerModel','program','fileFormat','dataIntervalSeconds','traces','timezone']
+        duplicates = files[test].duplicated().values
+        # Name reference and configuration yaml
+        files['fileTimestamp'] = files['fileTimestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
+        files['configFile'] = files['tableName']+'_'+files['fileTimestamp']+'.yml'
+        # Mask duplicates and ffill
+        files.loc[duplicates,['referenceFile','configFile']] = np.nan
+        files[['referenceFile','configFile']] = files[['referenceFile','configFile']].ffill()
+        return(files)
+    
+    def upload(self):
+        for cfg,files in self.inventory.items():
+            cfg = self.loadDict(os.path.join(self.metaPath,cfg))
+            for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
+                print(cfg['fileFormat'])
+                tbx = TOB3.from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
+                tbx.readTOB3()
+                tbx.formatTable()
+                if tbx.saveAs == 'dbBinary':
+                    self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['tableName']),cfg['dataIntervalSeconds'])
+                elif tbx.saveAs == 'ecf32':
+                    tbx.splitTable()
+
         breakpoint()
 
-
-
-    def getType(self,fpath,fname):
-        if fname.startswith('TOA5'):
+    def getType(self,fpath):
+        if os.path.split(fpath)[1].startswith('TOA5'):
             breakpoint()
         else:
-            fpath = os.path.join(fpath,fname)
             out = TOB3(fileName=fpath,projectPath=None)
             out.readTOB3()
             out = out.to_dict()
-            self.traces[fname] = out.pop('traces')
-            out['traces'] = json.dumps(self.traces[fname])
+            out['traces'] = json.dumps(out['traces'])
 
         return(out)

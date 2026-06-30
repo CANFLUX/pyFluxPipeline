@@ -29,7 +29,12 @@ if not os.path.isdir(projectPath):
         # 'ILL'
         ])
     
-SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/d/data-dump/RDEC1/20260614')
+SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/d/data-dump/RDEC1/20260614')#,ignoreTables='AmeriFluxFormat')
+# breakpoint()
+SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/d/data-dump/RDEC1/20260615')#,ignoreTables='AmeriFluxFormat')
+
+SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',processFiles=True)
+
 # ecf32(projectPath=projectPath).make('SEEP')
 
 

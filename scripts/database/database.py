@@ -3,6 +3,7 @@ from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass, field
 from datetime import datetime
 from scripts.project import project
+from configparser import ConfigParser
 import pandas as pd
 import numpy as np
 import shutil
@@ -43,6 +44,18 @@ class database(defaultSettings):
         else:
             frequency = (1.0 / interval)
         return frequency
+    
+    # def typeName(self,dtype):
+    #     if dtype == '<f4':
+    #         return 'float32'
+    #     elif dtype == '<i4':
+    #         return 'int32'
+    #     elif dtype == '<f8':
+    #         return 'float64'
+    #     elif dtype == '<i8':
+    #         return 'int64'
+    #     else:
+    #         self.logError('Not coded yet')
 
 
         
@@ -159,16 +172,14 @@ class highFrequencyDatabase(database):
 
     def ecf32Write(self,dataTable,traces,dataInterval,siteID,tableName,on='30min'):
         dataTable['fIndex'] = dataTable.index.floor('30min')
-        toSave = [value['variableName'] for value in traces.values() if not value['ignore']]
-        metadata = {variable:{
-            'units':traces['units'],
-            'sensorID':traces['sensorID'],
-            'measurementType':self.measurementType(traces['units']),
-            } for variable in toSave}
-        self.saveDict()
+        metadata = {variable['variableName']:{
+            'units':variable['units'],
+            'sensorID':variable['sensorID'],
+            'measurementType':self.measurementType(variable['units']),
+            } for variable in traces.values() if not variable['ignore'] and variable['dtype'] == '<f4'}
         self.logMessage('')
         for fIndex in dataTable['fIndex'].unique():
-            fileSlice = dataTable.loc[dataTable['fIndex']==fIndex,toSave]
+            fileSlice = dataTable.loc[dataTable['fIndex']==fIndex,list(metadata.keys())]
             fname = fileSlice.index[0].strftime(f'%Y%m%d%H%M%S_{self.secondsToHertz(dataInterval)}Hz.ecf32')
             fpath = os.path.join(self.highFrequencyPath,siteID,tableName,str(fIndex.year),str(fIndex.month).zfill(2))
             mdName = os.path.join(fpath,'metadata.yml')
@@ -176,6 +187,7 @@ class highFrequencyDatabase(database):
                 os.makedirs(fpath)
             if not os.path.isfile(mdName):
                 self.saveDict(metadata,mdName)
+                breakpoint()
             ecf32 = fileSlice.values.T.flatten().astype('float32')
             ecf32.tofile(os.path.join(fpath,fname))
 

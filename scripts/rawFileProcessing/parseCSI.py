@@ -52,7 +52,10 @@ class TOA5(csiTable):
 
 class TOB3(csiTable):
 
-    def readTOB3(self):
+    def __post_init__(self):
+        self.fileFormat = 'TOB3'
+        super().__post_init__()
+    # def readTOB3(self):
         self.headerRows = 6
         self.headerSize = 12
         self.footerSize = 4
@@ -391,19 +394,6 @@ class discoverCSI(highFrequencyDatabase):
         files[['referenceFile','configFile']] = files[['referenceFile','configFile']].ffill()
         return(files)
     
-    def upload(self):
-        for cfg,files in self.inventory.items():
-            cfg = self.loadDict(os.path.join(self.metaPath,cfg))
-            for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
-                print(cfg['fileFormat'])
-                tbx = TOB3.from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
-                tbx.readTOB3()
-                tbx.formatTable()
-                if tbx.saveAs == 'dbBinary':
-                    self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['tableName']),cfg['dataIntervalSeconds'])
-                elif tbx.saveAs == 'ecf32':
-                    self.ecf32Write(tbx.dataTable,cfg['traces'],cfg['dataIntervalSeconds'],self.siteID,cfg['tableName'])
-        breakpoint()
 
     def getType(self,fpath):
         if os.path.split(fpath)[1].startswith('TOA5'):

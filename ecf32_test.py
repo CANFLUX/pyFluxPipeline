@@ -2,6 +2,7 @@
 from scripts.rawFileProcessing.rawFile import rawFile
 # from scripts.traceAnalysis.firstStage import firstStage
 from scripts.rawFileProcessing.parseCSI import discoverCSI
+from scripts.rawFileProcessing.rawFile import discoverFiles
 from scripts.newProject import createProject
 from scripts.siteConfiguration import siteConfiguration
 import shutil
@@ -10,7 +11,7 @@ from scripts.ecf32.ecf32 import ecf32
 from scripts.database.database import highFrequencyDatabase
 
 
-reset = False
+reset = True
 
 # drive = 'E:'
 # if not os.path.isdir(drive):
@@ -29,11 +30,15 @@ if not os.path.isdir(projectPath):
         # 'ILL'
         ])
     
-# SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/d/data-dump/RDEC1/20260614')#,ignoreTables='AmeriFluxFormat')
+SeepFlux = discoverFiles(
+    projectPath=projectPath,
+    siteID='SEEP',
+    fileFormat='TOB3',
+    searchPath='/mnt/d/data-dump/RDEC1/20260614')#,ignoreFiles='Time_Series')
 # breakpoint()
-# SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/e/data-dump/RDEC1/20260615')#,ignoreTables='AmeriFluxFormat')
-# breakpoint()
-SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',processFiles=True)
+# SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/d/data-dump/RDEC1/20260615')#,ignoreTables='AmeriFluxFormat')
+breakpoint()
+SeepFlux = discoverFiles(projectPath=projectPath,siteID='SEEP',fileFormat='TOB3',processFiles=True)
 
 # ecf32(projectPath=projectPath).make('SEEP')
 

@@ -52,6 +52,7 @@ class sharedFields(superFormat):
     headerRows: int = field(default=None,repr=False)
     
     tableName: str = field(default=None,init=False)#,repr=False)
+    tableSize: str = field(default=None,init=False)#,repr=False)
     fileTimestamp: datetime = field(default=None,init=False)
     stationName: str = field(default=None,init=False)#,repr=False)
     loggerModel: str = field(default=None,init=False)#,repr=False)

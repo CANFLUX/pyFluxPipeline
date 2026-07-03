@@ -4,9 +4,11 @@ from ruamel.yaml.scalarstring import LiteralScalarString
 from pandas.api.types import is_numeric_dtype
 from dataclasses import dataclass,field
 import numpy as np
+import fnmatch
 import os
 
 defaultSettings = baseDataClass().loadDict(os.path.join(os.getcwd(),'configurationFiles','defaultSettings.yml'))
+firstStageMetDefaults = baseDataClass().loadDict(os.path.join(os.getcwd(),'configurationFiles','firstStageMetDefaults.yml'))
 
 class sharedMethods(baseDataClass):
 
@@ -29,6 +31,13 @@ class rawTrace(sharedMethods):
         self.originalVariable = cleanString(self.originalVariable,replace={'*':'star'})
         if self.variableName is None:
             self.variableName = self.originalVariable
+        if isinstance(self.ignore,list):
+            if self.originalVariable in self.ignore:
+                self.ignore = True
+            elif any([fnmatch.fnmatch(self.originalVariable,ignore) for ignore in self.ignore]):
+                self.ignore = True
+            else:
+                self.ignore = False
         if not self.ignore:
             if not is_numeric_dtype(self.dtype):
                 self.ignore = True
@@ -51,15 +60,32 @@ class firstStageTrace(sharedMethods):
     # linearInterpLimit: int = 1
     # linearRescale: list = field(default=None,metadata=mdMap('List of one or more len=4 list [m,b,start,stop].  Rescales as dataTrace = m*dataTrace+b over range [start:stop], or full trace if start and stop are None'))
     notes: str = None
+    useDefaults: bool = field(default=True,repr=False)
 
     def __post_init__(self):
         # if isinstance(self.inputFiles,list) and isinstance(self.inputDates,list) and isinstance(self.inputDates[0],list):
         #     self.inputFiles = {f:d for f,d in zip(self.inputFiles,self.inputDates)}
         if not isinstance(self.inputFiles,dict):
             self.inputFiles = {self.inputFiles:self.inputDates}
+        defaultSettings = [firstStageMetDefaults[param] for param in firstStageMetDefaults if self.variableName.startswith(param)]
+        if len(defaultSettings)>0:
+            if len(defaultSettings)>1:
+                self.logError('Multiple defaults matching pattern, adjust method')
+            defaultSettings = defaultSettings[0]
+            for key,value in defaultSettings.items():
+                self.__setattr__(key,value)
+
         # if not np.issubdtype(self.dtype,np.floating):
         #     self.linearInterpLimit = 0
         super().__post_init__()
+
+    def defaultCheck(self):
+        out = []
+        for param,defaults in firstStageMetDefaults.items():
+            if (param.startswith('_') and self.variableName.endswith(param)) or (param.endswith('_') and self.variableName.startswith(param)) or self.variableName == param:
+                out.append(defaults)
+        # if 
+
 
 @dataclass(kw_only=True)
 class secondStageTrace(sharedMethods):

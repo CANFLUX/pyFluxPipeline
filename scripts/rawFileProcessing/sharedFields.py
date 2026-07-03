@@ -3,6 +3,8 @@ from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass,field
 from datetime import datetime
 import pandas as pd
+import random
+import string
 import os
 
 formats = {
@@ -34,14 +36,6 @@ class superFormat(database):
 
     def __post_init__(self):
         super().__post_init__()
-    #     if superFormat[self.fileFormat] == 'CSI' and self.mode == 'identifyTraces':
-            
-    #     tableName: str = field(default=None,init=False,repr=False)
-    #     fileTimestamp: datetime = field(default=None,init=False,repr=False)
-    #     stationName: str = field(default=None,init=False,repr=False)
-    #     loggerModel: str = field(default=None,init=False,repr=False)
-    #     serialNumber: str = field(default=None,init=False,repr=False)
-    #     program: str = field(default=None,init=False,repr=False)
 
 @dataclass(kw_only=True)
 class sharedFields(superFormat):
@@ -51,6 +45,8 @@ class sharedFields(superFormat):
     skipRows: int = field(default=None,repr=False)
     headerRows: int = field(default=None,repr=False)
     
+    sourceID: str = field(default=None)
+
     tableName: str = field(default=None,init=False)#,repr=False)
     tableSize: str = field(default=None,init=False)#,repr=False)
     fileTimestamp: datetime = field(default=None,init=False)
@@ -62,10 +58,9 @@ class sharedFields(superFormat):
     fileFormat: str = field(default = None,metadata=mdMap('used to determine which file parser', options=list(formats.keys())))
     saveAs: str = field(default='dbBinary',metadata=mdMap('used to determine which file parser', options=['dbBinary','ecf32']))
     dataIntervalSeconds: float = field(default = None,metadata=mdMap('Autoparsed from file'))
-    ignore: list = field(default = None,metadata=mdMap('Optional list of parameters to ignore'))
+    ignoreTraces: list = field(default = None,metadata=mdMap('Optional list of parameters to ignore'))
     timestampFormat: str = field(default = None,metadata=mdMap('provide if cannot be parsed automatically', options=list(formats.keys())))
     traces: dict = field(default_factory=dict,metadata=mdMap('Autoparsed from file or user provieded'))
-    
 
     def __post_init__(self):
         if self.fileFormat is None:
@@ -75,7 +70,13 @@ class sharedFields(superFormat):
             self.fileExtension = formats[self.fileFormat]
         super().__post_init__()
 
+        if self.sourceID is None:
+            if self.tableName is None:
+                self.sourceID = ''.join([random.choice(string.ascii_letters) for i in range(4)])
+
+
     def formatTable(self):
+        
         if hasattr(self,'gpsDriftCorrection') and self.gpsDriftCorrection:
             # Identify gaps in time series
             Offset = (self.dataTable.index.diff().fillna(self.dataIntervalSeconds)-self.dataIntervalSeconds).cumsum()

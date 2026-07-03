@@ -1,7 +1,7 @@
 # from scripts.rawFileProcessing.fileInventory import fileInventory
-from scripts.rawFileProcessing.rawFile import rawFile
-# from scripts.traceAnalysis.firstStage import firstStage
-from scripts.rawFileProcessing.parseCSI import discoverCSI
+# from scripts.rawFileProcessing.rawFile import rawFile
+from scripts.traceAnalysis.firstStage import firstStage
+# from scripts.rawFileProcessing.parseCSI import discoverCSI
 from scripts.rawFileProcessing.rawFile import discoverFiles
 from scripts.newProject import createProject
 from scripts.siteConfiguration import siteConfiguration
@@ -12,6 +12,9 @@ from scripts.database.database import highFrequencyDatabase
 
 
 reset = True
+
+# wsl Note:
+# if drive not discovered, try: sudo mount -t drvfs D: /mnt/d (or E: ...)
 
 # drive = 'E:'
 # if not os.path.isdir(drive):
@@ -34,12 +37,17 @@ SeepFlux = discoverFiles(
     projectPath=projectPath,
     siteID='SEEP',
     fileFormat='TOB3',
-    searchPath='/mnt/d/data-dump/RDEC1/20260614')#,ignoreFiles='Time_Series')
-# breakpoint()
-# SeepFlux = discoverCSI(projectPath=projectPath,siteID='SEEP',searchPath='/mnt/d/data-dump/RDEC1/20260615')#,ignoreTables='AmeriFluxFormat')
+    searchPath='/mnt/d/data-dump/RDEC1/20260614',
+    ignoreFiles=['System_Operatn_Notes'],
+    ignoreTraces=['buff_depth_Max','T_CDM_VOLT*','FETCH_*','separation_*','FreqFactor_*','process_time*','slowsequence_Tot','air_mass*','*_Cov','*_f_Tot','fetch_wd_*','_WPL_*','rho_*_*','alpha','beta','FC_*','ET','ET_*','FCH4_*']
+    )
+
 breakpoint()
 SeepFlux = discoverFiles(projectPath=projectPath,siteID='SEEP',fileFormat='TOB3',processFiles=True)
 
+
+
+firstStage(projectPath=projectPath,sites='SEEP',years=[2026])
 # ecf32(projectPath=projectPath).make('SEEP')
 
 

@@ -45,15 +45,15 @@ class firstStage(database):
                 preEvaluate = siteConfig.ini['rawData'].pop('preEvaluate')
             else:
                 preEvaluate = None
-            metadataIn = {key: self.loadDict(os.path.join(self.projectPath,'Sites',siteID,'rawFiles',f'{key}.yml'))
-                      for key in siteConfig.ini['rawData'].keys()}
+            metadataIn = {
+                key: self.loadDict(os.path.join(self.projectPath,'Sites',siteID,f'{key}.yml'))
+                for key in siteConfig.ini['rawData'].keys()
+                }
             #get all dtypes and cast to full, empty array
             typeMap = {f"{key}.{k}":v['dtype'] for key in metadataIn.keys() for k,v in metadataIn[key]['traces'].items() if not v['ignore']}
             # create empty dataframe of desired types for raw inputs
             rawData = self.noDataTable(timestamp,typeMap)
 
-            
-           
             # Load raw traces
             dby = os.path.join(self.projectPath,'Database','YYYY',siteID,'raw')
 
@@ -61,12 +61,9 @@ class firstStage(database):
                 if value['dataIntervalSeconds']<self.dataIntervalSeconds:
                     self.logError('Not setup for >30min freq yet')
                 dbyPth = os.path.join(dby,key)
-                dateRange = pd.to_datetime(value['dateRange'])
-                if dateRange[0] < timestamp[0]:
-                    dateRange = pd.to_datetime([timestamp[0],dateRange[1]])
-                if dateRange[-1] > timestamp[-1]:
-                    dateRange = pd.to_datetime([dateRange[0],timestamp[-1]])
-                years = dateRange.year
+                # Use range defined in config
+                dateRange = pd.to_datetime(siteConfig.ini['rawData'][key])
+                years = [max(dateRange[0].year,timestamp[0].year),timestamp[-2].year if pd.isna(dateRange[-1]) else min(timestamp[-2].year,dateRange[-1].year)]
                 df = pd.concat([self.loadTraceFolder(dbyPth.replace('YYYY',str(year))) for year in range(years[0],years[-1]+1)])
                 df.columns = [f"{key}.{c}" for c in df.columns]
                 # Cast data to pre-generated "empty" df
@@ -84,7 +81,7 @@ class firstStage(database):
                 if traceName == self.posixName:
                     continue
                 for key,value in traceFS['inputFiles'].items():
-                    value = pd.to_datetime(value)
+                    # value = pd.to_datetime(value)
                     dataTable.loc[value[0]:value[-1],traceName] = rawData.loc[value[0]:value[-1],key].copy()  
 
                 if traceFS['minMax'] != [-np.inf,np.inf]:

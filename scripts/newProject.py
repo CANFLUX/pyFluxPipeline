@@ -51,6 +51,6 @@ class createProject(database):
         # Load default template
         self.saveDict(
             temp.to_dict(),
-            os.path.join(self.projectPath,'Sites',siteID,f"{siteID}_siteMetadata.yml")
+            os.path.join(self.projectPath,'Sites',siteID,"-siteMetadata.yml")
             )
         return(siteID,temp)

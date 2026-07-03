@@ -32,6 +32,10 @@ class csiTable(sharedFields):
         self.serialNumber=self.header[0][3]
         self.program=self.header[0][5]
 
+    def close(self):
+        self.fileTimestamp = self.fileTimestamp.tz_localize(self.timezone)
+        self.sourceID = f"{self.fileFormat}_{self.tableName}_{self.fileTimestamp.strftime('%Y%m%d%H%M')}"
+
 
 class TOA5(csiTable):
 
@@ -48,7 +52,12 @@ class TOA5(csiTable):
         self.dataTable.index = self.dataTable['TIMESTAMP']
         if self.traces == {}:
             typeMap = self.dataTable.dtypes
-            self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable]).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
+            if len(self.ignoreTraces):
+                ignore = self.ignoreTraces
+            else:
+                ignore = False
+            self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable],ignore=ignore).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
+        self.close()
 
 class TOB3(csiTable):
 
@@ -75,13 +84,17 @@ class TOB3(csiTable):
             self.frameResolution = pd.to_timedelta(parseFrequency(self.header[1][5])).total_seconds()
             self.nframes = int((self.fileSize-fileObject.tell())/self.frameSize)
             dtypes = self.translateTypes(self.header[5])
+            if len(self.ignoreTraces):
+                ignore = self.ignoreTraces
+            else:
+                ignore = False
             if self.traces == {}:
-                self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
+                self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype,ignore=ignore).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
                 self.tracesIn = list(self.traces.keys())
             else:
                 # Check of mismatches
                 # Less than defined is fine, extra undefined will cause problems
-                tracesIn = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
+                tracesIn = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype,ignore=ignore).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
                 if tracesIn.keys()!=self.traces.keys():
                     tIn = tracesIn.keys()
                     tEx = self.traces.keys()
@@ -90,6 +103,7 @@ class TOB3(csiTable):
                 self.tracesIn = list(tracesIn.keys())
             if self.mode == 'extractData':
                 self.readFrames(fileObject.read())
+        self.close()
 
     def translateTypes(self,dtypes):
         csiTypeMap = {
@@ -213,6 +227,7 @@ class MixedArray(csiTable):
             self.readArray()
     
     def readDEF(self):
+        self.sourceID = self.fileFormat+'_'+os.path.split(self.templateFile)[-1].split('.')[0]
         with open(self.templateFile,'r',encoding='utf-8-sig') as f:
             lines = f.readlines()
         Header,header = '',True
@@ -279,12 +294,11 @@ class MixedArray(csiTable):
                         unit = r[-1]
                     else:
                         unit = ''
-                    # data['operation'].append(operation)
                     data['units'].append(unit)
                     data['ignore'].append(ignore)
                 ix += 1
                 if ix ==3: ix = 0
-            
+             
             df = pd.DataFrame(data=data)
             if len(df.index)>self.mxCols:
                 self.mxCols = len(df.index)
@@ -292,9 +306,11 @@ class MixedArray(csiTable):
             for l,sensor in Labels.items():
                 df.loc[df['originalVariable'].str.contains(l),'sensorID']=sensor
             df.index = df['originalVariable']
-            self.traces = {key:rawTrace(originalVariable=key,units=value['units'],dtype=value['dtype']).to_dict() for key,value in df.to_dict('index').items()}
-            # df = {key:csiTrace.from_dict(value|{'ignoreByDefault':self.ignoreTraces,'kwargs':self.traceKwargs.copy(),'stageID':self.stageID}).to_dict() for key,value in df.to_dict('index').items()}
-            # self.traces = self.updateDict(self.traces,df)
+            if len(self.ignoreTraces):
+                ignore = self.ignoreTraces
+            else:
+                ignore = False
+            self.traces = {key:rawTrace(originalVariable=key,units=value['units'],dtype=value['dtype'],ignore=ignore).to_dict() for key,value in df.to_dict('index').items()}
             
             
     def readArray(self):
@@ -321,86 +337,3 @@ class MixedArray(csiTable):
         typeMap = {var['originalVariable']:var['dtype'] for var in self.traces.values()}
         self.dataTable = self.dataTable.astype(typeMap)
         # self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)
-
-
-@dataclass(kw_only=True)
-class discoverCSI(highFrequencyDatabase):
-    siteID: str
-    searchPath: str = None
-    processFiles: bool = False
-    ignoreTables: list = field(default_factory=list)
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.metaPath = os.path.join(self.projectPath,'Sites',self.siteID,'CSI_files')
-        fileInventoryPath = os.path.join(self.metaPath,'.inventory','fileInventory.json')
-        fileSetPath = os.path.join(self.metaPath,'.inventory','fileSets.json')
-
-        if os.path.isfile(fileInventoryPath):
-            self.inventory = self.loadDict(fileInventoryPath)
-            self.fileSets = pd.read_json(fileSetPath)
-            self.inList = [f for v in self.inventory.values() for f in v]
-        else:
-            os.makedirs(os.path.join(self.metaPath,'.inventory'),exist_ok=True)
-            self.inventory = {}
-            self.fileSets = pd.DataFrame()
-            self.inList = []
-            
-        if self.searchPath is not None:
-            self.updateInventory()
-            for configFile,row in self.fileSets.iterrows():
-                row = row.to_dict()
-                row['traces'] = json.loads(row['traces'])
-                self.saveDict(row,os.path.join(self.metaPath,configFile))
-            with open(fileInventoryPath,'w+') as fout:
-                json.dump(self.inventory,fout)
-            self.fileSets.to_json(fileSetPath)
-        
-        if self.processFiles:
-            self.upload()
-
-    def updateInventory(self):
-        files = self.discovery()
-        # Group by common configuration
-        self.fileSets = files.groupby('configFile').first()
-        files['processed'] = False
-        files = files[['configFile','fileName','processed']].groupby('configFile').agg(list).to_dict(orient='index')
-        for key,value in files.items():
-            if key not in self.inventory:
-                self.inventory[key] = value
-            else:
-                self.inventory[key]['processed'] += [False for v in value['fileName'] if v not in self.inventory[key]]
-                self.inventory[key]['fileName'] += [v for v in value['fileName'] if v not in self.inventory[key]]
-            
-    def discovery(self):
-        fileList = [os.path.join(self.searchPath,f) for f in os.listdir(self.searchPath) if f.endswith('.dat') and os.path.join(self.searchPath,f) not in self.inList]
-        # Discover files
-        files = pd.DataFrame({f:self.getType(f) for f in fileList}).T
-        # Remove unwated tables
-        files = files.loc[~files['tableName'].isin(self.ignoreTables)].copy()
-        files['fileName'] = files.index
-        files['referenceFile'] = files['fileName']
-        files = pd.concat([self.fileSets,files])
-        files['fileTimestamp'] = pd.to_datetime(files['fileTimestamp'])
-        files = files.sort_values(by=['tableName','traces','fileTimestamp'])
-        # It only matters if these columns are duplicated
-        test = ['tableName','loggerModel','program','fileFormat','dataIntervalSeconds','traces','timezone']
-        duplicates = files[test].duplicated().values
-        # Name reference and configuration yaml
-        files['fileTimestamp'] = files['fileTimestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S')
-        files['configFile'] = files['tableName']+'_'+files['fileTimestamp']+'.yml'
-        # Mask duplicates and ffill
-        files.loc[duplicates,['referenceFile','configFile']] = np.nan
-        files[['referenceFile','configFile']] = files[['referenceFile','configFile']].ffill()
-        return(files)
-    
-
-    def getType(self,fpath):
-        if os.path.split(fpath)[1].startswith('TOA5'):
-            breakpoint()
-        else:
-            out = TOB3(fileName=fpath,projectPath=None)
-            out.readTOB3()
-            out = out.to_dict()
-            out['traces'] = json.dumps(out['traces'])
-        return(out)

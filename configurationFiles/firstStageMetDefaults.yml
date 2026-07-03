@@ -1,0 +1,26 @@
+TA_:
+  minMax:
+  - -60
+  - 40
+RH_:
+  clamped_minMax:
+  - 0
+  - 100
+SW_:
+  minMax:
+  - -10
+  - 1361
+  clamped_minMax:
+  - 0
+  - .inf
+LW_:
+  minMax:
+  - -10
+  - 1361
+  clamped_minMax:
+  - 0
+  - .inf
+PPFD_:
+  clamped_minMax:
+  - 0
+  - .inf

@@ -77,7 +77,7 @@ class database(defaultSettings):
     def loadSiteConfiguration(self,siteID):
         return(
             siteConfiguration.from_yaml(
-                os.path.join(self.projectPath,'Sites',siteID,f"{siteID}_siteMetadata.yml"),
+                os.path.join(self.projectPath,'Sites',siteID,"-siteMetadata.yml"),
                 kwargs={'projectPath':self.projectPath}
                 )
             )
@@ -134,7 +134,6 @@ class database(defaultSettings):
         # remove duplicated rows
         if newData.index.duplicated().sum()>0:
             newData =  newData.loc[~newData.index.duplicated()].copy()
-        stageID = os.path.join('raw',stageID)
         if interval is None:
             interval = self.dataIntervalSeconds
         posixYearIndex = self.posixYears(interval)
@@ -170,7 +169,7 @@ class highFrequencyDatabase(database):
             mType = None
         return(mType)
 
-    def ecf32Write(self,dataTable,traces,dataInterval,siteID,tableName,on='30min'):
+    def ecf32Write(self,dataTable,traces,dataInterval,siteID,sourceID,on='30min'):
         dataTable['fIndex'] = dataTable.index.floor('30min')
         metadata = {variable['variableName']:{
             'units':variable['units'],
@@ -181,7 +180,7 @@ class highFrequencyDatabase(database):
         for fIndex in dataTable['fIndex'].unique():
             fileSlice = dataTable.loc[dataTable['fIndex']==fIndex,list(metadata.keys())]
             fname = fileSlice.index[0].strftime(f'%Y%m%d%H%M%S_{self.secondsToHertz(dataInterval)}Hz.ecf32')
-            fpath = os.path.join(self.highFrequencyPath,siteID,tableName,str(fIndex.year),str(fIndex.month).zfill(2))
+            fpath = os.path.join(self.highFrequencyPath,siteID,sourceID,str(fIndex.year),str(fIndex.month).zfill(2))
             mdName = os.path.join(fpath,'metadata.yml')
             if not os.path.isdir(fpath):
                 os.makedirs(fpath)
@@ -191,5 +190,5 @@ class highFrequencyDatabase(database):
             ecf32 = fileSlice.values.T.flatten().astype('float32')
             ecf32.tofile(os.path.join(fpath,fname))
 
-    def ecf32Read(self,siteID,tableName,start=None,stop=None):
-        fpath = os.path.join(self.highFrequencyPath,siteID,tableName)
+    def ecf32Read(self,siteID,sourceID,start=None,stop=None):
+        fpath = os.path.join(self.highFrequencyPath,siteID,sourceID)

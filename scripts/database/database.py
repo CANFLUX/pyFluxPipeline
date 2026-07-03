@@ -157,6 +157,8 @@ class highFrequencyDatabase(database):
 
     def __post_init__(self):  
         super().__post_init__()
+        if self.projectPath is None:
+            return
         self.highFrequencyPath = os.path.join(self.projectPath,'HighFrequencyData')
         
     def measurementType(self,units):
@@ -186,7 +188,6 @@ class highFrequencyDatabase(database):
                 os.makedirs(fpath)
             if not os.path.isfile(mdName):
                 self.saveDict(metadata,mdName)
-                breakpoint()
             ecf32 = fileSlice.values.T.flatten().astype('float32')
             ecf32.tofile(os.path.join(fpath,fname))
 

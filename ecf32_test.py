@@ -32,23 +32,26 @@ if not os.path.isdir(projectPath):
         # 'FIL', # Generic template for site FIL and ILL
         # 'ILL'
         ])
-    
-SeepFlux = discoverFiles(
-    projectPath=projectPath,
-    siteID='SEEP',
-    fileFormat='TOB3',
-    searchPath='/mnt/d/data-dump/RDEC1/20260614',
-    ignoreFiles=['System_Operatn_Notes'],
-    ignoreTraces=['buff_depth_Max','T_CDM_VOLT*','FETCH_*','separation_*','FreqFactor_*','process_time*','slowsequence_Tot','air_mass*','*_Cov','*_f_Tot','fetch_wd_*','_WPL_*','rho_*_*','alpha','beta','FC_*','ET','ET_*','FCH4_*']
-    )
 
-breakpoint()
-SeepFlux = discoverFiles(projectPath=projectPath,siteID='SEEP',fileFormat='TOB3',processFiles=True)
+if __name__ == '__main__':
+    data_dump = '/mnt/e/data-dump'
+        
+    SeepFlux = discoverFiles(
+        projectPath=projectPath,
+        siteID='SEEP',
+        fileFormat='TOB3',
+        searchPath=data_dump+'/RDEC1/20260614',
+        ignoreFiles=['System_Operatn_Notes'],
+        ignoreTraces=['sampleTime','Drop_rate_*','CH4_mole_fraction','nanoseconds_*','seconds_*','milliseconds_*','buff_depth_Max','T_CDM_VOLT*','FETCH_*','separation_*','FreqFactor_*','process_time*','slowsequence_Tot','air_mass*','*_Cov','*_f_Tot','fetch_wd_*','_WPL_*','rho_*_*','alpha','beta','FC_*','ET','ET_*','FCH4_*']
+        )
+
+    breakpoint()
+    SeepFlux = discoverFiles(projectPath=projectPath,siteID='SEEP',fileFormat='TOB3',processFiles=True)
 
 
 
-firstStage(projectPath=projectPath,sites='SEEP',years=[2026])
-# ecf32(projectPath=projectPath).make('SEEP')
+    firstStage(projectPath=projectPath,sites='SEEP',years=[2026])
+    # ecf32(projectPath=projectPath).make('SEEP')
 
 
 

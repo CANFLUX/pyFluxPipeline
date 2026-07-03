@@ -33,13 +33,21 @@ class csiTable(sharedFields):
         self.program=self.header[0][5]
 
     def close(self):
+        if self.dataIntervalSeconds<1: self.outputFormat = 'highfrequency'
         self.fileTimestamp = self.fileTimestamp.tz_localize(self.timezone)
-        self.sourceID = f"{self.fileFormat}_{self.tableName}_{self.fileTimestamp.strftime('%Y%m%d%H%M')}"
+        if self.sourceID is None:
+            self.sourceID = f"{self.fileFormat}_{self.tableName}_{self.fileTimestamp.strftime('%Y%m%d%H%M')}"
+        if self.mode == 'ecf32':
+            # breakpoint()
+            self.formatTable()
+            self.ecf32Write(self.dataTable,self.traces,self.dataIntervalSeconds,self.siteID,self.sourceID)
+
 
 
 class TOA5(csiTable):
 
-    def readTOA5(self):
+    def __post_init__(self):
+        self.fileFormat = 'TOA5'
         self.headerRows = 4
         with open(self.fileName,'r') as fileObject:
             self.parseHeader(fileObject)
@@ -101,7 +109,7 @@ class TOB3(csiTable):
                     if len([t for t in tIn if t not in tEx]):
                         self.logError(f"Unexpected traces in {self.fileName}:\n{[t for t in tIn if t not in tEx]} are not defined in configuration file")
                 self.tracesIn = list(tracesIn.keys())
-            if self.mode == 'extractData':
+            if self.mode == 'extractData' or self.mode == 'ecf32':
                 self.readFrames(fileObject.read())
         self.close()
 

@@ -15,10 +15,20 @@ class configMetadata:
     startYear: int = None
     stopYear: int = None
     timezone: str = None
+
+rawDefault = {
+    'preEvaluate':LiteralScalarString(
+'''# Codespace for preEvaluate corrections
+# unit conversions and corrections (e.g Convert F to C)
+# rawData["sourceID.TA"]=(rawData["sourceID.TA"]-32)*5/9'''
+         ),
+    'Database':{},
+    'highfrequency':{}}
+
 @dataclass(kw_only=True)
 class configTemplate:
     Metadata: dict = None
-    rawData: dict = field(default_factory=lambda:{'preEvaluate':LiteralScalarString('#Codespace for preEvaluate corrections\n#unit conversions and corrections (e.g Convert F to C)\n# rawData["TA"]=(rawData["TA"]-32)*5/9')})
+    rawData: dict = field(default_factory=lambda:rawDefault)
     Processing: dict = field(default_factory=lambda:{'FirstStage':{},'SecondStage':{},'ThirdStage':{}})
     def __post_init__(self):
         # if isinstance(self.Metadata,str):

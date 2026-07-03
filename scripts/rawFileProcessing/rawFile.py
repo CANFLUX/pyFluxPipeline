@@ -4,6 +4,8 @@ from scripts.rawFileProcessing.parseCSI import TOB3, TOA5, MixedArray
 from scripts.database.database import highFrequencyDatabase
 from ruamel.yaml.comments import CommentedSeq
 # from helperFunctions.baseClass import mdMap
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from dataclasses import dataclass, field
 import pandas as pd
 import numpy as np
@@ -38,6 +40,7 @@ class discoverFiles(highFrequencyDatabase):
         if self.searchPath is not None:
             self.updateInventory()
             for configFile,row in self.fileSets.iterrows():
+                configFile = os.path.sep.join(configFile)
                 row = row.to_dict()
                 row['traces'] = json.loads(row['traces'])
                 self.saveDict(row,os.path.join(self.metaPath,configFile))
@@ -53,15 +56,18 @@ class discoverFiles(highFrequencyDatabase):
     def updateInventory(self):
         files = self.discovery()
         # Group by common configuration
-        self.fileSets = files.groupby('configFile').first()
+        self.fileSets = files.groupby(['outputFormat','configFile']).first()
         files['processed'] = False
-        files = files[['configFile','fileName','processed']].groupby('configFile').agg(list).to_dict(orient='index')
+        files = files[['configFile','fileName','outputFormat','processed']].groupby(['outputFormat','configFile']).agg(list).to_dict(orient='index')
         for key,value in files.items():
-            if key not in self.inventory:
-                self.inventory[key] = value
+            if key[0] not in self.inventory:
+                self.inventory[key[0]] = {}
+
+            if key[1] not in self.inventory[key[0]]:
+                self.inventory[key[0]][key[1]] = value
             else:
-                self.inventory[key]['processed'] += [False for v in value['fileName'] if v not in self.inventory[key]]
-                self.inventory[key]['fileName'] += [v for v in value['fileName'] if v not in self.inventory[key]]
+                self.inventory[key[0]][key[1]]['processed'] += [False for v in value['fileName'] if v not in self.inventory[key]]
+                self.inventory[key[0]][key[1]]['fileName'] += [v for v in value['fileName'] if v not in self.inventory[key]]
         
     def discovery(self):
         fileList = [os.path.join(self.searchPath,f) for f in os.listdir(self.searchPath) if f.endswith('.dat') and os.path.join(self.searchPath,f) not in self.inList]
@@ -100,15 +106,23 @@ class discoverFiles(highFrequencyDatabase):
     
     def formatIni(self):
         self.siteConfig = self.loadSiteConfiguration(self.siteID)
-        rawData = self.siteConfig.ini['rawData']
+        rawDatabase = self.siteConfig.ini['rawData']['Database']
+        rawHighfrequency = self.siteConfig.ini['rawData']['highfrequency']
         first = self.siteConfig.ini['Processing']['FirstStage']
 
-        for i,file in self.fileSets.iterrows():
-            if file['sourceID'] not in rawData:
+        
+        for i,file in self.fileSets.loc[self.fileSets['dataIntervalSeconds']<1].iterrows():
+            self.dateRange = [file['fileTimestamp'],None]
+            inputDates = CommentedSeq(self.dateRange)
+            inputDates.yaml_set_anchor(f'{file['sourceID']}.inputDates')
+            rawHighfrequency[file['sourceID']] = inputDates
+
+        for i,file in self.fileSets.loc[self.fileSets['dataIntervalSeconds']>=1].iterrows():
+            if file['sourceID'] not in rawDatabase:
                 self.dateRange = [file['fileTimestamp'],None]
                 inputDates = CommentedSeq(self.dateRange)
                 inputDates.yaml_set_anchor(f'{file['sourceID']}.inputDates')
-                rawData[file['sourceID']] = inputDates
+                rawDatabase[file['sourceID']] = inputDates
                 if self.posixName not in first:
                     first[self.posixName] = firstStageTrace(
                         variableName=self.posixName,
@@ -139,16 +153,28 @@ class discoverFiles(highFrequencyDatabase):
         self.saveDict(self.siteConfig.ini,self.siteConfig.iniPath)
 
     def upload(self):
-        for cfg,files in self.inventory.items():
-            cfg = self.loadDict(os.path.join(self.metaPath,cfg))
+        for cfg,files in self.inventory['Database'].items():
+            cfg = self.loadDict(os.path.join(self.metaPath,'Database',cfg))
             for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
-                print(cfg['fileFormat'])
+                print(cfg['sourceID'])
                 tbx = TOB3.from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
-                # tbx.readTOB3()
                 tbx.formatTable()
-                if tbx.saveAs == 'dbBinary':
-                    self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['sourceID']),cfg['dataIntervalSeconds'])
-                elif tbx.saveAs == 'ecf32':
-                    pass
-                    # self.ecf32Write(tbx.dataTable,cfg['traces'],cfg['dataIntervalSeconds'],self.siteID,cfg['tableName'])
+                self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['sourceID']),cfg['dataIntervalSeconds'])
+        for cfg, files in self.inventory['highfrequency'].items():
+            cfg = self.loadDict(os.path.join(self.metaPath,'highfrequency',cfg))
+            cfg = cfg | {'siteID':self.siteID,'projectPath':self.projectPath,'mode':'ecf32'}
+            breakpoint()
+            partial_class = partial(mpTOB3,kwargs=cfg)
+            with ProcessPoolExecutor(max_workers=4) as executor:
+                out = {filename:None for filename, result in
+                                zip(files['fileName'],
+                                    executor.map(partial_class, files['fileName']))}
+            breakpoint()
+            # for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
+            #     print(cfg['sourceID'])
+            #     tbx = TOB3.from_dict(cfg|{'siteID':self.siteID,'projectPath':self.projectPath,'fileName':file,'mode':'ecf32'})
+                # tbx.formatTable()
+                # self.ecf32Write(tbx.dataTable,cfg['traces'],cfg['dataIntervalSeconds'],self.siteID,cfg['sourceID'])
 
+def mpTOB3(fileName,kwargs):
+    TOB3.from_dict(kwargs|{'fileName':fileName})

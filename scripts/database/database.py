@@ -35,6 +35,7 @@ class database(defaultSettings):
         if self.projectPath is None:
             return
         self.databasePath = os.path.join(self.projectPath,'Database')
+        self.highFrequencyPath = os.path.join(self.projectPath,'HighFrequencyData')
         if self.sitesList == []:
             self.sitesList = [pth for pth in os.listdir(os.path.join(self.projectPath,'Sites'))]
 
@@ -44,6 +45,9 @@ class database(defaultSettings):
         else:
             frequency = (1.0 / interval)
         return frequency
+    
+    def getStagePath(self,siteID,stageID,year='YYYY'):
+        return (os.path.join(self.databasePath,str(year),siteID,stageID))
     
     # def typeName(self,dtype):
     #     if dtype == '<f4':
@@ -151,45 +155,3 @@ class database(defaultSettings):
         dataTable = pd.concat(dataTable)
         dataTable.loc[newData.index] = newData.copy()
         self.writeTraceFolder(dataTable,siteID,stageID,interval)
-
-@dataclass(kw_only=True)
-class highFrequencyDatabase(database):
-
-    def __post_init__(self):  
-        super().__post_init__()
-        if self.projectPath is None:
-            return
-        self.highFrequencyPath = os.path.join(self.projectPath,'HighFrequencyData')
-        
-    def measurementType(self,units):
-        # Translate to eddypro specific expectation (gas samples only)
-        if 'm-3' in units or 'm^3' in units:
-            mType = 'density'
-        elif 'mol' in units:
-            mType = 'mixing ratio'
-        else:
-            mType = None
-        return(mType)
-
-    def ecf32Write(self,dataTable,traces,dataInterval,siteID,sourceID,on='30min'):
-        dataTable['fIndex'] = dataTable.index.floor('30min')
-        metadata = {variable['variableName']:{
-            'units':variable['units'],
-            'sensorID':variable['sensorID'],
-            'measurementType':self.measurementType(variable['units']),
-            } for variable in traces.values() if not variable['ignore'] and variable['dtype'] == '<f4'}
-        self.logMessage('')
-        for fIndex in dataTable['fIndex'].unique():
-            fileSlice = dataTable.loc[dataTable['fIndex']==fIndex,list(metadata.keys())]
-            fname = fileSlice.index[0].strftime(f'%Y%m%d%H%M%S_{self.secondsToHertz(dataInterval)}Hz.ecf32')
-            fpath = os.path.join(self.highFrequencyPath,siteID,sourceID,str(fIndex.year),str(fIndex.month).zfill(2))
-            mdName = os.path.join(fpath,'metadata.yml')
-            if not os.path.isdir(fpath):
-                os.makedirs(fpath)
-            if not os.path.isfile(mdName):
-                self.saveDict(metadata,mdName)
-            ecf32 = fileSlice.values.T.flatten().astype('float32')
-            ecf32.tofile(os.path.join(fpath,fname))
-
-    def ecf32Read(self,siteID,sourceID,start=None,stop=None):
-        fpath = os.path.join(self.highFrequencyPath,siteID,sourceID)

@@ -1,8 +1,9 @@
 from scripts.rawFileProcessing.parseCSV import EddyProOutput, HOBOcsv, NARRcsv
 from scripts.traceAnalysis.traceParameters import firstStageTrace
 from scripts.rawFileProcessing.parseCSI import TOB3, TOA5, MixedArray
-from scripts.database.database import highFrequencyDatabase
+from scripts.database.database import database
 from ruamel.yaml.comments import CommentedSeq
+from scripts.ecf32.ecf32 import ecf32#ecf32Setup,ecf32Write
 # from helperFunctions.baseClass import mdMap
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
@@ -13,13 +14,14 @@ import json
 import os
 
 @dataclass(kw_only=True)
-class discoverFiles(highFrequencyDatabase):
+class discoverFiles(database):
     siteID: str
     fileFormat: str
     searchPath: str = None
     processFiles: bool = False
     ignoreFiles: list = field(default_factory=list)
     ignoreTraces: list = field(default_factory=list)
+    renameTraces: dict = field(default_factory=dict)
 
     def __post_init__(self):
         super().__post_init__()
@@ -94,7 +96,7 @@ class discoverFiles(highFrequencyDatabase):
     def getMetadata(self,fpath):
         if self.fileFormat == 'TOB3':
             if len(self.ignoreTraces):
-                out = TOB3(fileName=fpath,projectPath=None,ignoreTraces=self.ignoreTraces)
+                out = TOB3(fileName=fpath,projectPath=None,ignoreTraces=self.ignoreTraces,renameTraces=self.renameTraces)
             else:
                 out = TOB3(fileName=fpath,projectPath=None)
         else:
@@ -163,18 +165,24 @@ class discoverFiles(highFrequencyDatabase):
         for cfg, files in self.inventory['highfrequency'].items():
             cfg = self.loadDict(os.path.join(self.metaPath,'highfrequency',cfg))
             cfg = cfg | {'siteID':self.siteID,'projectPath':self.projectPath,'mode':'ecf32'}
-            breakpoint()
-            partial_class = partial(mpTOB3,kwargs=cfg)
-            with ProcessPoolExecutor(max_workers=4) as executor:
-                out = {filename:None for filename, result in
-                                zip(files['fileName'],
-                                    executor.map(partial_class, files['fileName']))}
-            breakpoint()
-            # for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
-            #     print(cfg['sourceID'])
-            #     tbx = TOB3.from_dict(cfg|{'siteID':self.siteID,'projectPath':self.projectPath,'fileName':file,'mode':'ecf32'})
-                # tbx.formatTable()
-                # self.ecf32Write(tbx.dataTable,cfg['traces'],cfg['dataIntervalSeconds'],self.siteID,cfg['sourceID'])
 
-def mpTOB3(fileName,kwargs):
-    TOB3.from_dict(kwargs|{'fileName':fileName})
+        #     basePath,metadata=ecf32Setup(self.highFrequencyPath,self.siteID,cfg['sourceID'],cfg['traces'],cfg['dataIntervalSeconds'])
+        #     # breakpoint()
+        #     writer = partial(mpTOB3,config=cfg,basePath=basePath,metadata=metadata)
+        #     with ProcessPoolExecutor(max_workers=4) as executor:
+        #         out = {filename:True for filename, result in
+        #                         zip(files['fileName'],
+        #                             executor.map(writer, files['fileName']))}
+            
+        #     breakpoint()
+        
+
+def mpTOB3(fileName,config,basePath,metadata):
+    if config['fileType']:
+        out = TOB3.from_dict(config|{'fileName':fileName})
+        out.formatTable()
+        ecf32Write(out.dataTable,metadata,basePath)
+    # else:
+    #     return None
+
+    # return(out.dataTable)

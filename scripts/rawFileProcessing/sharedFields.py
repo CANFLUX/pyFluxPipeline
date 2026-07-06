@@ -1,8 +1,9 @@
-from scripts.database.database import highFrequencyDatabase
+from scripts.database.database import database
 from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass,field
 from datetime import datetime
 import pandas as pd
+import fnmatch
 import random
 import string
 import os
@@ -27,11 +28,11 @@ superFormats = {
 }
 
 @dataclass(kw_only=True)
-class superFormat(highFrequencyDatabase):
+class superFormat(database):
     mode: str = field(
         default='identifyTraces',
         repr=False,
-        metadata=mdMap('extract data or inspect header',options=['extractData','identifyTraces','ecf32']))
+        metadata=mdMap('extract data or inspect header',options=['extractData','identifyTraces']))
  
 
     def __post_init__(self):
@@ -45,8 +46,11 @@ class sharedFields(superFormat):
     skipRows: int = field(default=None,repr=False)
     headerRows: int = field(default=None,repr=False)
     
+    ignoreTraces: list = field(default_factory=list,repr=False,metadata=mdMap('Optional list of parameters to ignore'))
+    renameTraces: dict = field(default_factory=dict,repr=False,metadata=mdMap('Traces to rename'))
+    
     sourceID: str = field(default=None)
-    siteID: str = field(default=None,repr=False)
+    siteID: str = field(default=None)
 
     tableName: str = field(default=None,init=False)#,repr=False)
     tableSize: str = field(default=None,init=False)#,repr=False)
@@ -59,7 +63,6 @@ class sharedFields(superFormat):
     fileFormat: str = field(default = None,metadata=mdMap('used to determine which file parser', options=list(formats.keys())))
     outputFormat: str = field(default='Database',metadata=mdMap('used to determine which file parser', options=['Database','highfrequency']))
     dataIntervalSeconds: float = field(default = None,metadata=mdMap('Autoparsed from file'))
-    ignoreTraces: list = field(default = None,metadata=mdMap('Optional list of parameters to ignore'))
     timestampFormat: str = field(default = None,metadata=mdMap('provide if cannot be parsed automatically', options=list(formats.keys())))
     traces: dict = field(default_factory=dict,metadata=mdMap('Autoparsed from file or user provieded'))
 
@@ -75,6 +78,21 @@ class sharedFields(superFormat):
         #     if self.tableName is None:
         #         self.sourceID = ''.join([random.choice(string.ascii_letters) for i in range(4)])
 
+    def formatTraces(self):
+        if self.dataIntervalSeconds<1: self.outputFormat = 'highfrequency'
+        self.fileTimestamp = self.fileTimestamp.tz_localize(self.timezone)
+        if self.sourceID is None:
+            self.sourceID = f"{self.fileFormat}_{self.tableName}_{self.fileTimestamp.strftime('%Y%m%d%H%M')}"
+        if len(self.ignoreTraces) or len(self.renameTraces):
+            for trace in self.traces.values():
+                if any([fnmatch.fnmatch(trace['originalVariable'],ignore) for ignore in self.ignoreTraces]):
+                    trace['ignore'] = True
+                if trace['originalVariable'] in self.renameTraces:
+                    trace['variableName'] = self.renameTraces[trace['variableName']]
+
+
+
+        
 
     def formatTable(self):
         

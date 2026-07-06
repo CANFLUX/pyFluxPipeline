@@ -7,7 +7,6 @@ from helperFunctions.baseClass import mdMap
 from scripts.traceAnalysis.traceParameters import rawTrace
 from scripts.rawFileProcessing.sharedFields import sharedFields
 from datetime import datetime
-from scripts.database.database import highFrequencyDatabase
 import pandas as pd
 import numpy as np
 import struct
@@ -33,14 +32,10 @@ class csiTable(sharedFields):
         self.program=self.header[0][5]
 
     def close(self):
-        if self.dataIntervalSeconds<1: self.outputFormat = 'highfrequency'
-        self.fileTimestamp = self.fileTimestamp.tz_localize(self.timezone)
-        if self.sourceID is None:
-            self.sourceID = f"{self.fileFormat}_{self.tableName}_{self.fileTimestamp.strftime('%Y%m%d%H%M')}"
-        if self.mode == 'ecf32':
-            # breakpoint()
+        if self.mode == 'identifyTraces':
+            self.formatTraces()
+        if self.mode == 'extractData':
             self.formatTable()
-            self.ecf32Write(self.dataTable,self.traces,self.dataIntervalSeconds,self.siteID,self.sourceID)
 
 
 
@@ -60,11 +55,11 @@ class TOA5(csiTable):
         self.dataTable.index = self.dataTable['TIMESTAMP']
         if self.traces == {}:
             typeMap = self.dataTable.dtypes
-            if len(self.ignoreTraces):
-                ignore = self.ignoreTraces
-            else:
-                ignore = False
-            self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable],ignore=ignore).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
+            # if len(self.ignoreTraces):
+            #     ignore = self.ignoreTraces
+            # else:
+            #     ignore = False
+            self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable]).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
         self.close()
 
 class TOB3(csiTable):
@@ -92,24 +87,24 @@ class TOB3(csiTable):
             self.frameResolution = pd.to_timedelta(parseFrequency(self.header[1][5])).total_seconds()
             self.nframes = int((self.fileSize-fileObject.tell())/self.frameSize)
             dtypes = self.translateTypes(self.header[5])
-            if len(self.ignoreTraces):
-                ignore = self.ignoreTraces
-            else:
-                ignore = False
+            # if len(self.ignoreTraces):
+            #     ignore = self.ignoreTraces
+            # else:
+            #     ignore = False
             if self.traces == {}:
-                self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype,ignore=ignore).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
+                self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
                 self.tracesIn = list(self.traces.keys())
             else:
                 # Check of mismatches
                 # Less than defined is fine, extra undefined will cause problems
-                tracesIn = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype,ignore=ignore).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
+                tracesIn = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
                 if tracesIn.keys()!=self.traces.keys():
                     tIn = tracesIn.keys()
                     tEx = self.traces.keys()
                     if len([t for t in tIn if t not in tEx]):
                         self.logError(f"Unexpected traces in {self.fileName}:\n{[t for t in tIn if t not in tEx]} are not defined in configuration file")
                 self.tracesIn = list(tracesIn.keys())
-            if self.mode == 'extractData' or self.mode == 'ecf32':
+            if self.mode == 'extractData':
                 self.readFrames(fileObject.read())
         self.close()
 

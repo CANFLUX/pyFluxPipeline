@@ -36,21 +36,22 @@ class createProject(database):
     def newSite(self,siteID):
         if isinstance(siteID,str):
             if os.path.isfile(siteID):
-                temp = siteConfiguration.from_yaml(siteID,kwargs={'projectPath':self.projectPath})
+                temp = siteConfiguration.from_yaml(siteID,kwargs={'projectPath':self.projectPath,'readOnly':False})
                 siteID = temp.siteID
             elif siteID.isalnum():
-                temp = siteConfiguration(siteID=siteID,projectPath=self.projectPath,template=True,startDate=f"{self.currentYear}-01-01 00:00:00+00:00")
+                temp = siteConfiguration(siteID=siteID,projectPath=self.projectPath,template=True,startDate=f"{self.currentYear}-01-01 00:00:00+00:00",readOnly=False)
                 siteID = temp.siteID
             else:
                 self.logError(f"Invalid siteID: {siteID}")
         # Load user provided template dict
         elif isinstance(siteID,dict):
             siteID['projectPath'] = self.projectPath
-            temp = siteConfiguration(**siteID)
+            temp = siteConfiguration(**siteID,readOnly=False)
             siteID = temp.siteID
+        else:
         # Load default template
-        self.saveDict(
-            temp.to_dict(),
-            os.path.join(self.projectPath,'Sites',siteID,"-siteMetadata.yml")
-            )
+            self.saveDict(
+                temp.to_dict(),
+                os.path.join(self.projectPath,'Sites',siteID,"siteMetadata.yml")
+                )
         return(siteID,temp)

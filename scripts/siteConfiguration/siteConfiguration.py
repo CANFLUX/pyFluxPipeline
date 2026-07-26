@@ -1,9 +1,12 @@
 from scripts.siteConfiguration.hardware import dataLogger,sensor
 from helperFunctions.baseClass import spatialObject,mdMap
 from ruamel.yaml.scalarstring import LiteralScalarString
+from scripts.ecf32.ghgMetadata import ghgMetadata
+from scripts.project import defaultSettings
 from dataclasses import dataclass, field
 from datetime import datetime
-from scripts.project import project
+import pandas as pd
+import numpy as np
 import os
 
 @dataclass(kw_only=True)
@@ -35,12 +38,11 @@ class configTemplate:
         self.Metadata = configMetadata(**self.Metadata).__dict__
 
 @dataclass(kw_only=True)
-class siteConfiguration(project):
+class siteConfiguration(defaultSettings):
     siteID: str = field(metadata = mdMap('Unique siteID code'))
-    siteName: str = field(metadata = mdMap('Long-format name'))
+    siteName: str = field(default = None,metadata = mdMap('Long-format name'))
     startDate: datetime = field(metadata = mdMap('Start Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
     stopDate: datetime = field(default = None,metadata = mdMap('Stop Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
-    siteName: str = field(default = None,metadata = mdMap('Name of the Site'))
     sitePI: str = field(default = None,metadata=mdMap('Principal Investigator(s)'))
     lat_lon: spatialObject = field(default_factory=lambda:[None,None],metadata = mdMap('List of [Latitude, Longitude] coordinates in WGS1984 stored in decimal degrees.  Will parse coordinates if provided as strings in DMS or DDM format. For nested values, assumed to be same as parent object.  Optionally to provide if different from parent value.'))
     altitude: float = field(default = None,metadata = mdMap('Elevation (m.a.s.l).  For nested values, assumed to be same as parent object.  Optionally to provide if different from parent value.'))
@@ -50,13 +52,18 @@ class siteConfiguration(project):
     sensors: dict = field(default_factory=dict)
     dataSources: dict = field(default_factory=dict)
     template: bool = field(default=False,repr=False)
+    readOnly: bool = field(default=True,repr=False)
 
     def __post_init__(self):
-        self.checkHardware()
+        if not self.readOnly:
+            self.validateConfiguration()
+        else:
+            self.sensorGroups = pd.read_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorGroups.csv"),header=[0,1])
+            self.sensorHistory = pd.read_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorHistory.csv"))
         super().__post_init__()
         self.loadIni()
 
-    def checkHardware(self):
+    def validateConfiguration(self):
         # dataloggers first
         IDs = list(self.dataLoggers.keys())
         for id in IDs:
@@ -69,7 +76,32 @@ class siteConfiguration(project):
             params = self.sensors.pop(id)
             params = sensor.from_dict(params)
             self.sensors[params.hardwareID] = params
-
+            self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,"siteMetadata.yml"))
+        dates = []
+        for k,v in self.sensors.items():
+            if v.dateOut is not None:
+                rng = pd.date_range(v.dateIn,v.dateOut,inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
+            else:
+                rng = pd.date_range(v.dateIn,datetime.now(),inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
+            dates.append(pd.DataFrame(index=rng,data={k:[k for i in range(rng.shape[0])]}))
+        self.sensorHistory = pd.concat(dates,axis=1).fillna('')
+        self.sensorHistory['sensorGroup'] = self.sensorHistory.agg('_'.join,axis=1).str.replace(r'(_)\1+', '_', regex=True).str.strip('_')
+        self.sensorHistory = self.sensorHistory[['sensorGroup']]
+        self.sensorHistory.to_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorHistory.csv"))
+        tmp = self.sensorHistory.reset_index().groupby(['sensorGroup']).count()
+        groupMeta = ghgMetadata()
+        self.sensorGroups = pd.concat([
+            pd.DataFrame(index=[sensorGroup],
+                         data = {
+                            (key,subKey):value for key,subSet in
+                            groupMeta.siteData(self,sensorGroup.split('_')).items()
+                            for subKey,value in subSet.items()
+                         }
+            )
+            for sensorGroup in tmp.index
+        ])
+        self.sensorGroups.to_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorGroups.csv"))
+          
     
     def loadIni(self):
         self.iniPath = os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini',f"{self.siteID}_config.yml")
@@ -81,4 +113,5 @@ class siteConfiguration(project):
                 'lat':self.lat_lon[0],
                 'long':self.lat_lon[1],
                 }).__dict__
-        self.saveDict(self.ini,self.iniPath)
+        if not self.readOnly:
+            self.saveDict(self.ini,self.iniPath)

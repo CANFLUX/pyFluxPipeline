@@ -90,10 +90,6 @@ class sharedFields(superFormat):
                 if trace['originalVariable'] in self.renameTraces:
                     trace['variableName'] = self.renameTraces[trace['variableName']]
 
-
-
-        
-
     def formatTable(self):
         
         if hasattr(self,'gpsDriftCorrection') and self.gpsDriftCorrection:

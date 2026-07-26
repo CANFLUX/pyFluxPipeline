@@ -5,6 +5,8 @@ from scripts.database.database import database
 from ruamel.yaml.comments import CommentedSeq
 from scripts.ecf32.ecf32 import ecf32#ecf32Setup,ecf32Write
 # from helperFunctions.baseClass import mdMap
+from scripts.rawFileProcessing.sharedFields import sharedFields
+from scripts.ecf32.ghgMetadata import ghgMetadata
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from dataclasses import dataclass, field
@@ -13,18 +15,23 @@ import numpy as np
 import json
 import os
 
+processor = {
+    'TOB3':TOB3
+}
+
 @dataclass(kw_only=True)
-class discoverFiles(database):
+class discoverFiles(sharedFields):
     siteID: str
     fileFormat: str
+    fileName: str = None
     searchPath: str = None
     processFiles: bool = False
     ignoreFiles: list = field(default_factory=list)
-    ignoreTraces: list = field(default_factory=list)
-    renameTraces: dict = field(default_factory=dict)
+    findFiles: list = field(default_factory=list)
 
     def __post_init__(self):
         super().__post_init__()
+        self.siteConfig = self.loadSiteConfiguration(self.siteID)
         self.metaPath = os.path.join(self.projectPath,'Sites',self.siteID)
         fileInventoryPath = os.path.join(self.metaPath,'.inventory','fileInventory.json')
         fileSetPath = os.path.join(self.metaPath,'.inventory','fileSets.json')
@@ -53,14 +60,17 @@ class discoverFiles(database):
         
         if self.processFiles:
             self.formatIni()
-            self.upload()
+            if 'Database' in self.inventory and len(self.inventory['Database']):
+                self.uploadDatabase()
+            if 'highfrequency' in self.inventory and len(self.inventory['highfrequency']):
+                self.uploadHighFrequency()
 
     def updateInventory(self):
         files = self.discovery()
         # Group by common configuration
         self.fileSets = files.groupby(['outputFormat','configFile']).first()
         files['processed'] = False
-        files = files[['configFile','fileName','outputFormat','processed']].groupby(['outputFormat','configFile']).agg(list).to_dict(orient='index')
+        files = files[['configFile','fileName','outputFormat','processed','fileTimestamp']].groupby(['outputFormat','configFile']).agg(list).to_dict(orient='index')
         for key,value in files.items():
             if key[0] not in self.inventory:
                 self.inventory[key[0]] = {}
@@ -68,15 +78,28 @@ class discoverFiles(database):
             if key[1] not in self.inventory[key[0]]:
                 self.inventory[key[0]][key[1]] = value
             else:
-                self.inventory[key[0]][key[1]]['processed'] += [False for v in value['fileName'] if v not in self.inventory[key]]
-                self.inventory[key[0]][key[1]]['fileName'] += [v for v in value['fileName'] if v not in self.inventory[key]]
+                self.inventory[key[0]][key[1]]['processed'] += [False for v in value['fileName'] if v not in self.inventory[key[0]][key[1]]['processed']]
+                self.inventory[key[0]][key[1]]['fileName'] += [v for v in value['fileName'] if v not in self.inventory[key[0]][key[1]]['fileName']]
+                self.inventory[key[0]][key[1]]['fileTimestamp'] += [v for v in value['fileTimestamp'] if v not in self.inventory[key[0]][key[1]]['fileName']]
+        
         
     def discovery(self):
-        fileList = [os.path.join(self.searchPath,f) for f in os.listdir(self.searchPath) if f.endswith('.dat') and os.path.join(self.searchPath,f) not in self.inList]
+        fileList = [
+            os.path.join(dir,fileName) for dir,_,fileNames in os.walk(self.searchPath) 
+            for fileName in fileNames
+            if '.archive' not in dir and os.path.join(dir,fileName) not in self.inList]
+        if not len(fileList):
+            breakpoint()
+            return
+        # fileList = [os.path.join(self.searchPath,f) for f in os.listdir(self.searchPath) if f.endswith('.dat') and os.path.join(self.searchPath,f) not in self.inList]
         # Discover files
         files = pd.DataFrame({f:self.getMetadata(f) for f in fileList}).T
-        # Remove unwated tables
-        files = files.loc[~files['tableName'].isin(self.ignoreFiles)].copy()
+        if len(self.ignoreFiles):
+            # Remove unwated tables
+            files = files.loc[~files['tableName'].isin(self.ignoreFiles)].copy()
+        elif len(self.findFiles):
+            # Or only keep wated tables
+            files = files.loc[files['tableName'].isin(self.findFiles)].copy()
         files['fileName'] = files.index
         files['referenceFile'] = files['fileName']
         files = pd.concat([self.fileSets,files])
@@ -94,20 +117,21 @@ class discoverFiles(database):
         return(files)
     
     def getMetadata(self,fpath):
-        if self.fileFormat == 'TOB3':
-            if len(self.ignoreTraces):
-                out = TOB3(fileName=fpath,projectPath=None,ignoreTraces=self.ignoreTraces,renameTraces=self.renameTraces)
-            else:
-                out = TOB3(fileName=fpath,projectPath=None)
+        if self.fileFormat in processor.keys():
+            out = processor[self.fileFormat](
+                siteID=self.siteID,
+                fileName=fpath,
+                projectPath=None,
+                ignoreTraces=self.ignoreTraces,
+                renameTraces=self.renameTraces
+                )
         else:
             print(self.fileFormat)
-            breakpoint()
         out = out.to_dict()
         out['traces'] = json.dumps(out['traces'])
         return(out)
     
     def formatIni(self):
-        self.siteConfig = self.loadSiteConfiguration(self.siteID)
         rawDatabase = self.siteConfig.ini['rawData']['Database']
         rawHighfrequency = self.siteConfig.ini['rawData']['highfrequency']
         first = self.siteConfig.ini['Processing']['FirstStage']
@@ -154,21 +178,36 @@ class discoverFiles(database):
             # self.saveConfigFile(self.fileConfigPath)
         self.saveDict(self.siteConfig.ini,self.siteConfig.iniPath)
 
-    def upload(self):
-        for cfg,files in self.inventory['Database'].items():
-            cfg = self.loadDict(os.path.join(self.metaPath,'Database',cfg))
+    def uploadDatabase(self):
+        for fileConfigName,files in self.inventory['Database'].items():
+            fileConfig = self.loadDict(os.path.join(self.metaPath,'Database',fileConfigName))
             for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
-                print(cfg['sourceID'])
-                tbx = TOB3.from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
-                tbx.formatTable()
-                self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['sourceID']),cfg['dataIntervalSeconds'])
-        for cfg, files in self.inventory['highfrequency'].items():
-            cfg = self.loadDict(os.path.join(self.metaPath,'highfrequency',cfg))
-            cfg = cfg | {'siteID':self.siteID,'projectPath':self.projectPath,'mode':'ecf32'}
+                if not processed:
+                    tbx = processor[self.fileFormat].from_dict(
+                        fileConfig|{
+                            'projectPath':self.projectPath,
+                            'fileName':file,
+                            'mode':'extractData'
+                            })
+                    self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',fileConfig['sourceID']),fileConfig['dataIntervalSeconds'])
+                    self.inventory['Database'][fileConfigName]['processed'][i]=True
 
-        #     basePath,metadata=ecf32Setup(self.highFrequencyPath,self.siteID,cfg['sourceID'],cfg['traces'],cfg['dataIntervalSeconds'])
+    def uploadHighFrequency(self):
+        for fileConfigName, files in self.inventory['highfrequency'].items():
+            fileConfig = self.loadDict(os.path.join(self.metaPath,'highfrequency',fileConfigName))
+            # kwargs = fileConfig | {'siteID':self.siteID,'projectPath':self.projectPath,'mode':'ecf32'}
+            breakpoint()
+            # ecf = ecf32(
+            #     projectPath=self.projectPath,
+            #     siteID=self.siteID,
+            #     sourceID=fileConfig['sourceID'],
+            #     kwargs=self.siteConfig.to_dict()|fileConfig
+            #     )
+            # self.inventory['highfrequency'][fileConfigName]['processed'][i]=True
+
+        #     basePath,metadata=ecf32Setup(self.highFrequencyPath,self.siteID,fileConfig['sourceID'],fileConfig['traces'],fileConfig['dataIntervalSeconds'])
         #     # breakpoint()
-        #     writer = partial(mpTOB3,config=cfg,basePath=basePath,metadata=metadata)
+        #     writer = partial(mpTOB3,config=fileConfig,basePath=basePath,metadata=metadata)
         #     with ProcessPoolExecutor(max_workers=4) as executor:
         #         out = {filename:True for filename, result in
         #                         zip(files['fileName'],

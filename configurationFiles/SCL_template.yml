@@ -68,7 +68,7 @@ sensors:
   TC1:
     modelName: TC
     serialNumber: SSM
-    dateIN: *V1_dateIn
+    dateIn: *V2_dateIn
     sensorType: biomet
     northwardSeparation: -50
     eastwardSeparation: -10 

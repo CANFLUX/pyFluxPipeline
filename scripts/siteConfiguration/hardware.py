@@ -5,24 +5,32 @@ import numpy as np
 
 mdMap = baseClass.mdMap
 
+# sensorSpecs = {
+#     'IRGASON-sonic':{},
+#     'IRGASON-irga':{
+#         'vpath':15.37
+#         'hpath':
+#     }
+# }
+
 @dataclass(kw_only=True)
 class common(baseClass.baseDataClass):
     dateIn: datetime = None
     dateOut: datetime = None
     stationName: str = field(
-        default = None,
+        default = '',
         metadata = mdMap('Custom descriptor variable')
             )
     manufacturer: str = field(
-        default = None,
+        default = '',
         metadata = mdMap('Self explanatory')
         )
     modelName: str = field(
-        default=None,
+        default='',
         metadata = mdMap('The logger model, auto-filled from class name')
         )
     serialNumber: str = field(
-        default = None,
+        default = '',
         metadata = mdMap('Serial# (if known)')
         )
     hardwareID: str = field(init=False,repr=False)
@@ -56,8 +64,11 @@ class sensorPosition():
     xSeparation: float = field(default = None,metadata=mdMap('Lateral separation from reference sonic (in m) parallel to the main axis of the sonic (towards mast/sonic head = positive).  See Fig D2 in (https://s.campbellsci.com/documents/us/manuals/easyflux-dl-cr6op.pdf) for example.  Required for irgas, and any secondary sonics to calculate northward/eastward separation if not provided.'))
     ySeparation: float = field(default = None,metadata=mdMap('Lateral separation from reference sonic (in m) perpendicular to the main axis of the sonic (right of mast/sonic head = positive).  See Fig D2 in (https://s.campbellsci.com/documents/us/manuals/easyflux-dl-cr6op.pdf) for example.  Required for irgas, and any secondary sonics to calculate northward/eastward separation if not provided.'))
 
+    tubeLenght: float = field(default = 0.0,metadata=mdMap('Length of closed path tube'))
+    tubeDiameter: float = field(default = 0.0,metadata=mdMap('Diameter of closed path tube'))
+
     def getPosition(self,sensorType):
-        if sensorType not in ['sonic','sonic-irga','irga']:
+        if sensorType not in ['sonic','sonic-irga','irga','irga-closed']:
             return
         elif sensorType in ['sonic','sonic-irga']:
             if self.Zm is None:
@@ -118,4 +129,17 @@ class sensor(common,sensorPosition):
         
         if self.sensorID is None:
             self.sensorID = self.hardwareID
-        
+        if self.dateIn is None:
+            self.logError(f"{self.sensorID} missing required dateIn")   
+
+        if self.sensorType != 'irga-closed':
+            self.__dataclass_fields__['tubeLenght'].repr=False
+            self.__dataclass_fields__['tubeDiameter'].repr=False
+        else:
+            self.__dataclass_fields__['tubeLenght'].repr=True
+            self.__dataclass_fields__['tubeDiameter'].repr=True
+        if self.sensorType == 'irga' or self.sensorType == 'irga-close':
+            self.__dataclass_fields__['Zm'].repr=False
+        else:
+            self.__dataclass_fields__['Zm'].repr=True
+

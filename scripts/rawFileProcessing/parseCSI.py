@@ -37,8 +37,6 @@ class csiTable(sharedFields):
         if self.mode == 'extractData':
             self.formatTable()
 
-
-
 class TOA5(csiTable):
 
     def __post_init__(self):
@@ -77,7 +75,10 @@ class TOB3(csiTable):
         self.fileSize = os.path.getsize(self.fileName)
         with open(self.fileName,'rb') as fileObject:
             self.parseHeader(fileObject)
-            self.fileTimestamp = pd.to_datetime(self.header[0][-1])
+            try:
+                self.fileTimestamp = pd.to_datetime(self.header[0][-1])
+            except:
+                breakpoint()
             self.tableName = self.header[1][0]
             self.dataIntervalSeconds = pd.to_timedelta(parseFrequency(self.header[1][1])).total_seconds()
             self.frameSize = int(self.header[1][2])

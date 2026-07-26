@@ -1,27 +1,13 @@
 from scripts.siteConfiguration.siteConfiguration import siteConfiguration
 from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass, field
-from datetime import datetime
-from scripts.project import project
-from configparser import ConfigParser
+from scripts.project import defaultSettings
 import pandas as pd
 import numpy as np
 import shutil
 import os
 
 
-
-@dataclass
-class defaultSettings(project):
-    dataIntervalSeconds: float = 1800.0 # Defaults to 1800s (30 min) for the database, however any format is acceptable for a given database folder
-    timezone: str = 'UTC' # defaults to UTC for simplicity, but can be set to any timezone on a site or data-source specific basis
-    # posixYears = posixYears
-    intMask = -9999 # NO DATA value for integer data
-    defaultDataType = 'float32' # Any numeric type acceptable, float32 & int32 preferred for optimizing precisions vs. storage requirements
-    posixName = 'posix_time' # Filename of python time-trace (stored in posix format with int64 dtype)
-    datenumName = 'clean_tv' # Legacy variable to allow interoperability of generated database with Biomet.net
-    
-    currentYear = datetime.now().year
 
 @dataclass(kw_only=True)
 class database(defaultSettings):
@@ -81,7 +67,7 @@ class database(defaultSettings):
     def loadSiteConfiguration(self,siteID):
         return(
             siteConfiguration.from_yaml(
-                os.path.join(self.projectPath,'Sites',siteID,"-siteMetadata.yml"),
+                os.path.join(self.projectPath,'Sites',siteID,"siteMetadata.yml"),
                 kwargs={'projectPath':self.projectPath}
                 )
             )

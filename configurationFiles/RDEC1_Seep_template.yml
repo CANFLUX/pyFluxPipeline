@@ -28,8 +28,16 @@ sensors:
     verticalSeparation: 0
   TC1:
     modelName: TC
-    serialNumber: SSM
-    dateIN: *V1_dateIn
+    serialNumber: 3
+    dateIn: *V1_dateIn
+    dateOut: 2026-07-10T15:00:00
+    sensorType: biomet
+    xSeparation: 0.5
+    ySeparation: 0.1
+  TC2:
+    modelName: TC
+    serialNumber: 4
+    dateIn: 2026-07-10T15:00:00
     dateOut: *V1_dateOut
     sensorType: biomet
     xSeparation: 0.5

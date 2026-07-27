@@ -53,10 +53,6 @@ class TOA5(csiTable):
         self.dataTable.index = self.dataTable['TIMESTAMP']
         if self.traces == {}:
             typeMap = self.dataTable.dtypes
-            # if len(self.ignoreTraces):
-            #     ignore = self.ignoreTraces
-            # else:
-            #     ignore = False
             self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable]).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
         self.close()
 
@@ -65,7 +61,6 @@ class TOB3(csiTable):
     def __post_init__(self):
         self.fileFormat = 'TOB3'
         super().__post_init__()
-    # def readTOB3(self):
         self.headerRows = 6
         self.headerSize = 12
         self.footerSize = 4
@@ -104,10 +99,7 @@ class TOB3(csiTable):
             if self.mode == 'extractData':
                 self.readFrames(fileObject.read())
             else:
-                startDate,stopDate = self.readFrames(fileObject.read(),firstLast=True)
-                print(self.fileName)
-                print(startDate,stopDate)
-                print()
+                self.startDate,self.stopDate = self.readFrames(fileObject.read(),firstLast=True)
         self.close()
 
     def translateTypes(self,dtypes):
@@ -141,7 +133,6 @@ class TOB3(csiTable):
         
         tracesIn = {key:self.traces[key] for key in self.tracesIn}
         if firstLast:
-            breakpoint()
             if self.dataIntervalSeconds == 0:
                 return(None,None)
             elif self.dataIntervalSeconds < 1:
@@ -154,22 +145,14 @@ class TOB3(csiTable):
 
             if len(frames)>1:
                 return(
-                    pd.to_datetime((frames[0][0]*1e9)+frames[0][1],unit='ns').floor(freq='1s'),
-                    pd.to_datetime((frames[-1][0]*1e9)+frames[-1][1],unit='ns').ceil(freq='1s'),
+                    pd.to_datetime((frames[0][0]*1e9)+frames[0][1],unit='ns').floor(freq='1s').to_pydatetime(),
+                    pd.to_datetime((frames[-1][0]*1e9)+frames[-1][1],unit='ns').ceil(freq='1s').to_pydatetime(),
                     )
             else:
                 return(None,None)
         # Process frame by frame
         frames = [f for i in range(self.nframes) for f in 
                 self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
-        # if firstLast:
-        #     if len(frames)>1:
-        #         try:
-        #         except:
-        #             print('??')
-        #             breakpoint()
-        #     else:
-        #         return(None,None)
         dataTable = pd.DataFrame(frames,columns=list(self.indexColumns.keys())+list(tracesIn.keys()))
         # Separate indices (parsed from headers) from traces
         self.indexTraces = dataTable[list(self.indexColumns.keys())].astype(

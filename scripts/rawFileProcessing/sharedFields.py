@@ -66,6 +66,9 @@ class sharedFields(superFormat):
     timestampFormat: str = field(default = None,metadata=mdMap('provide if cannot be parsed automatically', options=list(formats.keys())))
     traces: dict = field(default_factory=dict,metadata=mdMap('Autoparsed from file or user provieded'))
 
+    startDate: datetime = field(default=None)
+    stopDate: datetime = field(default=None)
+
     def __post_init__(self):
         if self.fileFormat is None:
             self.fileFormat = type(self).__name__

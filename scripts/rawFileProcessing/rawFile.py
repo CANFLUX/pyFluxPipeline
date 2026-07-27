@@ -52,6 +52,7 @@ class discoverFiles(sharedFields):
                 configFile = os.path.sep.join(configFile)
                 row = row.to_dict()
                 row['traces'] = json.loads(row['traces'])
+                breakpoint()
                 self.saveDict(row,os.path.join(self.metaPath,configFile))
             with open(fileInventoryPath,'w+') as fout:
                 json.dump(self.inventory,fout)
@@ -100,6 +101,7 @@ class discoverFiles(sharedFields):
         elif len(self.findFiles):
             # Or only keep wated tables
             files = files.loc[files['tableName'].isin(self.findFiles)].copy()
+        breakpoint()
         files['fileName'] = files.index
         files['referenceFile'] = files['fileName']
         files = pd.concat([self.fileSets,files])

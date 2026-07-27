@@ -141,6 +141,7 @@ class TOB3(csiTable):
         
         tracesIn = {key:self.traces[key] for key in self.tracesIn}
         if firstLast:
+            breakpoint()
             if self.dataIntervalSeconds == 0:
                 return(None,None)
             elif self.dataIntervalSeconds < 1:

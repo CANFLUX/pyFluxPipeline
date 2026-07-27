@@ -58,8 +58,9 @@ class siteConfiguration(defaultSettings):
         if not self.readOnly:
             self.validateConfiguration()
         else:
-            self.sensorGroups = pd.read_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorGroups.csv"),header=[0,1])
-            self.sensorHistory = pd.read_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorHistory.csv"))
+            self.sensorGroups = pd.read_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorGroups.csv"),header=[0,1],index_col=[0])
+            self.sensorHistory = pd.read_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorHistory.csv"),index_col=[0])
+            self.sensorHistory.index = pd.to_datetime(self.sensorHistory.index)
         super().__post_init__()
         self.loadIni()
 
@@ -94,7 +95,12 @@ class siteConfiguration(defaultSettings):
             pd.DataFrame(index=[sensorGroup],
                          data = {
                             (key,subKey):value for key,subSet in
-                            groupMeta.siteData(self,sensorGroup.split('_')).items()
+                            groupMeta.siteData(
+                                self,
+                                sensorGroup.split('_'),
+                                start_date=self.sensorHistory.loc[self.sensorHistory.sensorGroup==sensorGroup].index.min(),
+                                stop_date=self.sensorHistory.loc[self.sensorHistory.sensorGroup==sensorGroup].index.max(),
+                                ).items()
                             for subKey,value in subSet.items()
                          }
             )

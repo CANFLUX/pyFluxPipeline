@@ -195,8 +195,12 @@ class discoverFiles(sharedFields):
     def uploadHighFrequency(self):
         for fileConfigName, files in self.inventory['highfrequency'].items():
             fileConfig = self.loadDict(os.path.join(self.metaPath,'highfrequency',fileConfigName))
+            # ghgMetadata.
             # kwargs = fileConfig | {'siteID':self.siteID,'projectPath':self.projectPath,'mode':'ecf32'}
             breakpoint()
+
+            # processor
+
             # ecf = ecf32(
             #     projectPath=self.projectPath,
             #     siteID=self.siteID,

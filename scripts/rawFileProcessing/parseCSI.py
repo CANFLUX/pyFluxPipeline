@@ -88,10 +88,6 @@ class TOB3(csiTable):
             self.frameResolution = pd.to_timedelta(parseFrequency(self.header[1][5])).total_seconds()
             self.nframes = int((self.fileSize-fileObject.tell())/self.frameSize)
             dtypes = self.translateTypes(self.header[5])
-            # if len(self.ignoreTraces):
-            #     ignore = self.ignoreTraces
-            # else:
-            #     ignore = False
             if self.traces == {}:
                 self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
                 self.tracesIn = list(self.traces.keys())
@@ -107,6 +103,11 @@ class TOB3(csiTable):
                 self.tracesIn = list(tracesIn.keys())
             if self.mode == 'extractData':
                 self.readFrames(fileObject.read())
+            else:
+                startDate,stopDate = self.readFrames(fileObject.read(),firstLast=True)
+                print(self.fileName)
+                print(startDate,stopDate)
+                print()
         self.close()
 
     def translateTypes(self,dtypes):
@@ -131,7 +132,7 @@ class TOB3(csiTable):
         return(pyTypes)
 
 
-    def readFrames(self,binaryData):
+    def readFrames(self,binaryData,firstLast=False):
         # Parameters dictating extraction  
         self.recordSize = struct.calcsize('>'+self.byteMap)
         self.recordsPerFrame = int((self.frameSize-self.headerSize-self.footerSize)/self.recordSize)
@@ -139,10 +140,35 @@ class TOB3(csiTable):
         # Extract the binary data
         
         tracesIn = {key:self.traces[key] for key in self.tracesIn}
+        if firstLast:
+            if self.dataIntervalSeconds == 0:
+                return(None,None)
+            elif self.dataIntervalSeconds < 1:
+                # Sample at 1sec resolutoin for expediency to identify the "last" (almost) record
+                frames = [f for i in range(0,self.nframes,int(1/min(1,self.dataIntervalSeconds))) for f in 
+                    self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
+            else:
+                frames = [f for i in range(self.nframes) for f in 
+                    self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
 
+            if len(frames)>1:
+                return(
+                    pd.to_datetime((frames[0][0]*1e9)+frames[0][1],unit='ns').floor(freq='1s'),
+                    pd.to_datetime((frames[-1][0]*1e9)+frames[-1][1],unit='ns').ceil(freq='1s'),
+                    )
+            else:
+                return(None,None)
         # Process frame by frame
         frames = [f for i in range(self.nframes) for f in 
                 self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
+        # if firstLast:
+        #     if len(frames)>1:
+        #         try:
+        #         except:
+        #             print('??')
+        #             breakpoint()
+        #     else:
+        #         return(None,None)
         dataTable = pd.DataFrame(frames,columns=list(self.indexColumns.keys())+list(tracesIn.keys()))
         # Separate indices (parsed from headers) from traces
         self.indexTraces = dataTable[list(self.indexColumns.keys())].astype(

@@ -47,7 +47,7 @@ if __name__ == '__main__' and reset:
 
     SeepFlux = discoverFiles(projectPath=projectPath,siteID='SEEP',fileFormat='TOB3',processFiles=True)
 firstStage(projectPath=projectPath,sites='SEEP',years=[2026])
-# breakpoint()
+breakpoint()
 SeepFlux = discoverFiles(
     projectPath=projectPath,
     siteID='SEEP',

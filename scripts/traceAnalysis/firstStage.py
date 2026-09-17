@@ -59,7 +59,8 @@ class firstStage(database):
 
             for key,value in metadataIn.items():
                 if value['dataIntervalSeconds']<self.dataIntervalSeconds:
-                    self.logError('Not setup for >30min freq yet')
+                    print('Not setup for >30min freq yet')
+                    continue
                 dbyPth = os.path.join(dby,key)
                 # Use range defined in config
                 dateRange = pd.to_datetime(siteConfig.ini['rawData'][key])

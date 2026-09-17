@@ -37,7 +37,7 @@ SeepFlux = discoverFiles(
     projectPath=projectPath,
     siteID='SEEP',
     fileFormat='TOB3',
-    searchPath='/mnt/d/data-dump/RDEC1/20260614',
+    searchPath='/mnt/d/data-dump/RDEC1/2026',
     ignoreFiles=['System_Operatn_Notes'],
     ignoreTraces=['buff_depth_Max','T_CDM_VOLT*','FETCH_*','separation_*','FreqFactor_*','process_time*','slowsequence_Tot','air_mass*','*_Cov','*_f_Tot','fetch_wd_*','_WPL_*','rho_*_*','alpha','beta','FC_*','ET','ET_*','FCH4_*']
     )

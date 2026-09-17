@@ -64,11 +64,11 @@ class discoverFiles(highFrequencyDatabase):
                 self.inventory[key]['fileName'] += [v for v in value['fileName'] if v not in self.inventory[key]]
         
     def discovery(self):
-        fileList = [os.path.join(self.searchPath,f) for f in os.listdir(self.searchPath) if f.endswith('.dat') and os.path.join(self.searchPath,f) not in self.inList]
-        # Discover files
+        suffix = {'TOB3':'.dat'}
+        fileList = [os.path.join(dir,file) for dir,_,files in os.walk(self.searchPath) for file in files if file.endswith(suffix[self.fileFormat]) and os.path.join(self.searchPath,file) not in self.inList and len(files)]
         files = pd.DataFrame({f:self.getMetadata(f) for f in fileList}).T
         # Remove unwated tables
-        files = files.loc[~files['tableName'].isin(self.ignoreFiles)].copy()
+        files = files.loc[((~files['tableName'].isin(self.ignoreFiles))&(files['fileFormat'].notna()))].copy()
         files['fileName'] = files.index
         files['referenceFile'] = files['fileName']
         files = pd.concat([self.fileSets,files])
@@ -95,6 +95,10 @@ class discoverFiles(highFrequencyDatabase):
             print(self.fileFormat)
             breakpoint()
         out = out.to_dict()
+        if out['dataIntervalSeconds'] is None or out['dataIntervalSeconds'] <= 0:
+            out['saveAs'] = None
+        elif out['dataIntervalSeconds']<60:
+            out['saveAs'] = 'ecf32'
         out['traces'] = json.dumps(out['traces'])
         return(out)
     
@@ -104,7 +108,7 @@ class discoverFiles(highFrequencyDatabase):
         first = self.siteConfig.ini['Processing']['FirstStage']
 
         for i,file in self.fileSets.iterrows():
-            if file['sourceID'] not in rawData:
+            if file['sourceID'] not in rawData and file['saveAs'] is not None:
                 self.dateRange = [file['fileTimestamp'],None]
                 inputDates = CommentedSeq(self.dateRange)
                 inputDates.yaml_set_anchor(f'{file['sourceID']}.inputDates')
@@ -142,13 +146,14 @@ class discoverFiles(highFrequencyDatabase):
         for cfg,files in self.inventory.items():
             cfg = self.loadDict(os.path.join(self.metaPath,cfg))
             for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
-                print(cfg['fileFormat'])
-                tbx = TOB3.from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
-                # tbx.readTOB3()
-                tbx.formatTable()
-                if tbx.saveAs == 'dbBinary':
+                print(file,cfg['fileFormat'],cfg['dataIntervalSeconds'],cfg['saveAs'])
+                if cfg['saveAs'] == 'dbBinary':
+                    tbx = TOB3.from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
+                    tbx.formatTable()
+                    print(tbx.dataTable)
                     self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['sourceID']),cfg['dataIntervalSeconds'])
-                elif tbx.saveAs == 'ecf32':
+                elif cfg['saveAs'] == 'ecf32':
+                    print('not writing ecf32')
                     pass
                     # self.ecf32Write(tbx.dataTable,cfg['traces'],cfg['dataIntervalSeconds'],self.siteID,cfg['tableName'])
 

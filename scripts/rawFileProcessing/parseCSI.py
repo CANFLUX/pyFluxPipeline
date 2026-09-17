@@ -27,6 +27,8 @@ class csiTable(sharedFields):
             else:
                 return(line.decode('ascii').strip().replace('"','').split(','))
         self.header = [readHeaderLine(fileObject.readline()) for l in range(self.headerRows)]
+        if self.header[0][0] != self.fileFormat:
+            return
         self.stationName=self.header[0][1]
         self.loggerModel=self.header[0][2]
         self.serialNumber=self.header[0][3]
@@ -40,9 +42,12 @@ class csiTable(sharedFields):
 class TOA5(csiTable):
 
     def readTOA5(self):
+        self.fileFormat = 'TOA5'
         self.headerRows = 4
         with open(self.fileName,'r') as fileObject:
             self.parseHeader(fileObject)
+            if self.fileFormat is None:
+                return
             self.fileTimestamp = datetime.strptime(re.search(r'([0-9]{4}\_[0-9]{2}\_[0-9]{2}\_[0-9]{4})', self.fileName.rsplit('.',1)[0]).group(0),'%Y_%m_%d_%H%M')
             self.tableName = self.header[0][-1]
             defaultTypes = defaultdict(lambda: '<f4',RECORD ='<u4',TIMESTAMP = 'str')
@@ -74,6 +79,9 @@ class TOB3(csiTable):
         self.fileSize = os.path.getsize(self.fileName)
         with open(self.fileName,'rb') as fileObject:
             self.parseHeader(fileObject)
+            if self.header[0][0] != self.fileFormat:
+                self.fileFormat = None
+                return
             self.fileTimestamp = pd.to_datetime(self.header[0][-1])
             self.tableName = self.header[1][0]
             self.dataIntervalSeconds = pd.to_timedelta(parseFrequency(self.header[1][1])).total_seconds()

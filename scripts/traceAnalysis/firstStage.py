@@ -42,12 +42,12 @@ class firstStage(database):
 
             # Load metadata for raw traces
             if 'preEvaluate' in siteConfig.ini['rawData'].keys():
-                preEvaluate = siteConfig.ini['rawData'].pop('preEvaluate')
+                preEvaluate = siteConfig.ini['rawData']['preEvaluate']#.pop('preEvaluate')
             else:
                 preEvaluate = None
             metadataIn = {
-                key: self.loadDict(os.path.join(self.projectPath,'Sites',siteID,f'{key}.yml'))
-                for key in siteConfig.ini['rawData'].keys()
+                key: self.loadDict(os.path.join(self.projectPath,'Sites',siteID,'Database',f'{key}.yml'))
+                for key in siteConfig.ini['rawData']['Database'].keys()
                 }
             #get all dtypes and cast to full, empty array
             typeMap = {f"{key}.{k}":v['dtype'] for key in metadataIn.keys() for k,v in metadataIn[key]['traces'].items() if not v['ignore']}
@@ -63,7 +63,7 @@ class firstStage(database):
                     continue
                 dbyPth = os.path.join(dby,key)
                 # Use range defined in config
-                dateRange = pd.to_datetime(siteConfig.ini['rawData'][key])
+                dateRange = pd.to_datetime(siteConfig.ini['rawData']['Database'][key])
                 years = [max(dateRange[0].year,timestamp[0].year),timestamp[-2].year if pd.isna(dateRange[-1]) else min(timestamp[-2].year,dateRange[-1].year)]
                 df = pd.concat([self.loadTraceFolder(dbyPth.replace('YYYY',str(year))) for year in range(years[0],years[-1]+1)])
                 df.columns = [f"{key}.{c}" for c in df.columns]

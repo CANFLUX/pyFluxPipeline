@@ -1,27 +1,13 @@
 from scripts.siteConfiguration.siteConfiguration import siteConfiguration
 from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass, field
-from datetime import datetime
-from scripts.project import project
-from configparser import ConfigParser
+from scripts.project import defaultSettings
 import pandas as pd
 import numpy as np
 import shutil
 import os
 
 
-
-@dataclass
-class defaultSettings(project):
-    dataIntervalSeconds: float = 1800.0 # Defaults to 1800s (30 min) for the database, however any format is acceptable for a given database folder
-    timezone: str = 'UTC' # defaults to UTC for simplicity, but can be set to any timezone on a site or data-source specific basis
-    # posixYears = posixYears
-    intMask = -9999 # NO DATA value for integer data
-    defaultDataType = 'float32' # Any numeric type acceptable, float32 & int32 preferred for optimizing precisions vs. storage requirements
-    posixName = 'posix_time' # Filename of python time-trace (stored in posix format with int64 dtype)
-    datenumName = 'clean_tv' # Legacy variable to allow interoperability of generated database with Biomet.net
-    
-    currentYear = datetime.now().year
 
 @dataclass(kw_only=True)
 class database(defaultSettings):
@@ -35,6 +21,7 @@ class database(defaultSettings):
         if self.projectPath is None:
             return
         self.databasePath = os.path.join(self.projectPath,'Database')
+        self.highFrequencyPath = os.path.join(self.projectPath,'HighFrequencyData')
         if self.sitesList == []:
             self.sitesList = [pth for pth in os.listdir(os.path.join(self.projectPath,'Sites'))]
 
@@ -44,6 +31,9 @@ class database(defaultSettings):
         else:
             frequency = (1.0 / interval)
         return frequency
+    
+    def getStagePath(self,siteID,stageID,year='YYYY'):
+        return (os.path.join(self.databasePath,str(year),siteID,stageID))
     
     # def typeName(self,dtype):
     #     if dtype == '<f4':
@@ -77,7 +67,7 @@ class database(defaultSettings):
     def loadSiteConfiguration(self,siteID):
         return(
             siteConfiguration.from_yaml(
-                os.path.join(self.projectPath,'Sites',siteID,"-siteMetadata.yml"),
+                os.path.join(self.projectPath,'Sites',siteID,"siteMetadata.yml"),
                 kwargs={'projectPath':self.projectPath}
                 )
             )
@@ -151,44 +141,3 @@ class database(defaultSettings):
         dataTable = pd.concat(dataTable)
         dataTable.loc[newData.index] = newData.copy()
         self.writeTraceFolder(dataTable,siteID,stageID,interval)
-
-@dataclass(kw_only=True)
-class highFrequencyDatabase(database):
-
-    def __post_init__(self):  
-        super().__post_init__()
-        self.highFrequencyPath = os.path.join(self.projectPath,'HighFrequencyData')
-        
-    def measurementType(self,units):
-        # Translate to eddypro specific expectation (gas samples only)
-        if 'm-3' in units or 'm^3' in units:
-            mType = 'density'
-        elif 'mol' in units:
-            mType = 'mixing ratio'
-        else:
-            mType = None
-        return(mType)
-
-    def ecf32Write(self,dataTable,traces,dataInterval,siteID,sourceID,on='30min'):
-        dataTable['fIndex'] = dataTable.index.floor('30min')
-        metadata = {variable['variableName']:{
-            'units':variable['units'],
-            'sensorID':variable['sensorID'],
-            'measurementType':self.measurementType(variable['units']),
-            } for variable in traces.values() if not variable['ignore'] and variable['dtype'] == '<f4'}
-        self.logMessage('')
-        for fIndex in dataTable['fIndex'].unique():
-            fileSlice = dataTable.loc[dataTable['fIndex']==fIndex,list(metadata.keys())]
-            fname = fileSlice.index[0].strftime(f'%Y%m%d%H%M%S_{self.secondsToHertz(dataInterval)}Hz.ecf32')
-            fpath = os.path.join(self.highFrequencyPath,siteID,sourceID,str(fIndex.year),str(fIndex.month).zfill(2))
-            mdName = os.path.join(fpath,'metadata.yml')
-            if not os.path.isdir(fpath):
-                os.makedirs(fpath)
-            if not os.path.isfile(mdName):
-                self.saveDict(metadata,mdName)
-                breakpoint()
-            ecf32 = fileSlice.values.T.flatten().astype('float32')
-            ecf32.tofile(os.path.join(fpath,fname))
-
-    def ecf32Read(self,siteID,sourceID,start=None,stop=None):
-        fpath = os.path.join(self.highFrequencyPath,siteID,sourceID)

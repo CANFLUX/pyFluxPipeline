@@ -57,6 +57,12 @@ class csvFile(sharedFields):
         self.typeMap = self.dataTable.dtypes
         self.typeMap[self.typeMap=='float64'] = 'float32'
         self.dataTable = self.dataTable.astype(self.typeMap)
+        
+    def close(self):
+        if self.mode == 'identifyTraces':
+            self.formatTraces()
+        if self.mode == 'extractData':
+            self.formatTable()
 
 class NARRcsv(csvFile):
 
@@ -74,6 +80,7 @@ class NARRcsv(csvFile):
             self.traces = {i:rawTrace.from_dict(
                 {'originalVariable':variable,'units':unit,'dtype':self.typeMap[i]}).to_dict() for i,(siteID,variable,unit) in enumerate(zip(self.header[0],self.header[1],self.header[2])) if siteID == self.siteID}
 
+        self.close()
         # breakpoint()
 
 # @dataclass(kw_only=True)
@@ -99,6 +106,7 @@ class EddyProOutput(csvFile):
         )
         self.dataTable.index = TIMESTAMP 
 
+        self.close()
 # @dataclass(kw_only=True)
 class HOBOcsv(csvFile):
 
@@ -137,3 +145,5 @@ class HOBOcsv(csvFile):
         if self.dataIntervalSeconds is None:
             self.dataIntervalSeconds = self.dataTable.index.diff().median().total_seconds()
         # self.dataTable = self.dataTable.resample(f'{self.dataIntervalSeconds}s').asfreq()
+
+        self.close()

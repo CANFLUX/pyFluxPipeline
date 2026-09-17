@@ -7,7 +7,6 @@ from helperFunctions.baseClass import mdMap
 from scripts.traceAnalysis.traceParameters import rawTrace
 from scripts.rawFileProcessing.sharedFields import sharedFields
 from datetime import datetime
-from scripts.database.database import highFrequencyDatabase
 import pandas as pd
 import numpy as np
 import struct
@@ -35,11 +34,13 @@ class csiTable(sharedFields):
         self.program=self.header[0][5]
 
     def close(self):
-        self.fileTimestamp = self.fileTimestamp.tz_localize(self.timezone)
-        self.sourceID = f"{self.fileFormat}_{self.tableName}_{self.fileTimestamp.strftime('%Y%m%d%H%M')}"
-
+        if self.mode == 'identifyTraces':
+            self.formatTraces()
+        if self.mode == 'extractData':
+            self.formatTable()
 
 class TOA5(csiTable):
+
 
     def readTOA5(self):
         self.fileFormat = 'TOA5'
@@ -57,11 +58,7 @@ class TOA5(csiTable):
         self.dataTable.index = self.dataTable['TIMESTAMP']
         if self.traces == {}:
             typeMap = self.dataTable.dtypes
-            if len(self.ignoreTraces):
-                ignore = self.ignoreTraces
-            else:
-                ignore = False
-            self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable],ignore=ignore).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
+            self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable]).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
         self.close()
 
 class TOB3(csiTable):
@@ -69,7 +66,6 @@ class TOB3(csiTable):
     def __post_init__(self):
         self.fileFormat = 'TOB3'
         super().__post_init__()
-    # def readTOB3(self):
         self.headerRows = 6
         self.headerSize = 12
         self.footerSize = 4
@@ -92,17 +88,13 @@ class TOB3(csiTable):
             self.frameResolution = pd.to_timedelta(parseFrequency(self.header[1][5])).total_seconds()
             self.nframes = int((self.fileSize-fileObject.tell())/self.frameSize)
             dtypes = self.translateTypes(self.header[5])
-            if len(self.ignoreTraces):
-                ignore = self.ignoreTraces
-            else:
-                ignore = False
             if self.traces == {}:
-                self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype,ignore=ignore).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
+                self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
                 self.tracesIn = list(self.traces.keys())
             else:
                 # Check of mismatches
                 # Less than defined is fine, extra undefined will cause problems
-                tracesIn = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype,ignore=ignore).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
+                tracesIn = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict() for variable,unit,dtype in zip(self.header[2],self.header[3],dtypes)}
                 if tracesIn.keys()!=self.traces.keys():
                     tIn = tracesIn.keys()
                     tEx = self.traces.keys()
@@ -111,6 +103,8 @@ class TOB3(csiTable):
                 self.tracesIn = list(tracesIn.keys())
             if self.mode == 'extractData':
                 self.readFrames(fileObject.read())
+            else:
+                self.startDate,self.stopDate = self.readFrames(fileObject.read(),firstLast=True)
         self.close()
 
     def translateTypes(self,dtypes):
@@ -135,7 +129,7 @@ class TOB3(csiTable):
         return(pyTypes)
 
 
-    def readFrames(self,binaryData):
+    def readFrames(self,binaryData,firstLast=False):
         # Parameters dictating extraction  
         self.recordSize = struct.calcsize('>'+self.byteMap)
         self.recordsPerFrame = int((self.frameSize-self.headerSize-self.footerSize)/self.recordSize)
@@ -143,7 +137,24 @@ class TOB3(csiTable):
         # Extract the binary data
         
         tracesIn = {key:self.traces[key] for key in self.tracesIn}
+        if firstLast:
+            if self.dataIntervalSeconds == 0:
+                return(None,None)
+            elif self.dataIntervalSeconds < 1:
+                # Sample at 1sec resolutoin for expediency to identify the "last" (almost) record
+                frames = [f for i in range(0,self.nframes,int(1/min(1,self.dataIntervalSeconds))) for f in 
+                    self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
+            else:
+                frames = [f for i in range(self.nframes) for f in 
+                    self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
 
+            if len(frames)>1:
+                return(
+                    pd.to_datetime((frames[0][0]*1e9)+frames[0][1],unit='ns').floor(freq='1s').to_pydatetime(),
+                    pd.to_datetime((frames[-1][0]*1e9)+frames[-1][1],unit='ns').ceil(freq='1s').to_pydatetime(),
+                    )
+            else:
+                return(None,None)
         # Process frame by frame
         frames = [f for i in range(self.nframes) for f in 
                 self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]

@@ -1,0 +1,30 @@
+index: 
+  headerName: TIMESTAMP_1
+  units: yyyy-mm-dd HHMM
+  fmt: '%Y-%m-%d %H%M'
+traces:
+  LWIN_1_1_1:
+    headerName: LWIN_1_1_1
+    databaseName: LW_IN_1_1_1
+    units: W+1m-2
+  Pa_1_1_1:
+    headerName: Pa_1_1_1
+    databaseName: PA_1_1_1
+    units: kPa
+  PPFD_IN_1_1_1:
+    headerName: PPFD_1_1_1
+    databaseName: PPFD_IN_1_1_1
+    units: umol+1m-2s-1
+  RH_1_1_1:
+    headerName: RH_1_1_1
+    databaseName: RH_1_1_1
+    units: '%'
+  Rg_1_1_1:
+    headerName: Rg_1_1_1
+    databaseName: SW_IN_1_1_1
+    units: W+1m-2
+  Ta_1_1_1:
+    headerName: Ta_1_1_1
+    databaseName: TA_1_1_1
+    units: degC
+    

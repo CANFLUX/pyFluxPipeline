@@ -1,4 +1,3 @@
-;GHG_METADATA
 [Project]
 title=
 id=
@@ -83,6 +82,21 @@ instr_3_hpath_length=1.0000
 instr_3_tau=0.1000
 instr_3_kw=0.150000
 instr_3_ko=0.008500
+instr_4_manufacturer=licor
+instr_4_model=
+instr_4_sw_version=
+instr_4_id=
+instr_4_tube_length=0.0
+instr_4_tube_diameter=0.0
+instr_4_tube_flowrate=0.00
+instr_4_northward_separation=0.00
+instr_4_eastward_separation=0.00
+instr_4_vertical_separation=0.00
+instr_4_vpath_length=1.0000
+instr_4_hpath_length=1.0000
+instr_4_tau=0.1000
+instr_4_kw=0.150000
+instr_4_ko=0.008500
 
 [FileDescription]
 separator=

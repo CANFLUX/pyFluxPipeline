@@ -114,6 +114,7 @@ class discoverFiles(sharedFields):
         return(files)
     
     def getMetadata(self,fpath):
+        print(fpath)
         if self.fileFormat in processor.keys():
             out = processor[self.fileFormat](
                 siteID=self.siteID,
@@ -140,7 +141,7 @@ class discoverFiles(sharedFields):
         for i,file in self.fileSets.iterrows():
             if file['sourceID'] not in rawData and file['saveAs'] is not None:
 
-            self.logMessage('Do thisss?')
+                self.logMessage('Do thisss?')
         # for i,file in self.fileSets.loc[self.fileSets['dataIntervalSeconds']<1].iterrows():
         #     self.dateRange = [file['fileTimestamp'],None]
         #     inputDates = CommentedSeq(self.dateRange)

@@ -13,7 +13,7 @@ class firstStage(database):
 
     def __post_init__(self):
         super().__post_init__()
-        for siteID in self.sitesList:
+        for siteID in self.sites:
             T1 = time()
             # load site configuration
             siteConfig = self.loadSiteConfiguration(siteID)
@@ -58,6 +58,7 @@ class firstStage(database):
             dby = os.path.join(self.projectPath,'Database','YYYY',siteID,'raw')
 
             for key,value in metadataIn.items():
+                
                 if value['dataIntervalSeconds']<self.dataIntervalSeconds:
                     print('Not setup for >30min freq yet')
                     continue
@@ -72,7 +73,7 @@ class firstStage(database):
                 # as constituent dataframes may not have mutually inclusive indices 
                 rawData.loc[df.index,df.columns] = df.copy()
             
-            rawData.to_csv('testing/rawData.csv',index_label='timestamp')
+            rawData.to_csv(f'testing/{siteID}rawData.csv',index_label='timestamp')
             
             if preEvaluate:    
                 exec(preEvaluate)
@@ -96,6 +97,7 @@ class firstStage(database):
                 dataTable = self.Dependencies(dataTable,firstStageDependencies)
             self.writeTraceFolder(dataTable,siteID,'FirstStage',clearFirst=True)
             print(f'Executed {siteID} FirstStage in:',time()-T1)
+            self.dataTable = dataTable
             
     def Dependencies(self,dataTable,dependencies):
         if len(dependencies):

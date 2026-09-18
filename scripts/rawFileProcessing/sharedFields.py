@@ -61,14 +61,14 @@ class sharedFields(superFormat):
     program: str = field(default=None,init=False)#,repr=False)
     
     fileFormat: str = field(default = None,metadata=mdMap('used to determine which file parser', options=list(formats.keys())))
-    outputFormat: str = field(default='Database',metadata=mdMap('used to determine which file parser', options=['Database','highfrequency']))
+    # outputFormat: str = field(default='Database',metadata=mdMap('used to determine which file parser', options=['Database','highfrequency']))
     dataIntervalSeconds: float = field(default = None,metadata=mdMap('Autoparsed from file'))
     timestampFormat: str = field(default = None,metadata=mdMap('provide if cannot be parsed automatically', options=list(formats.keys())))
     traces: dict = field(default_factory=dict,metadata=mdMap('Autoparsed from file or user provieded'))
 
     startDate: datetime = field(default=None)
     stopDate: datetime = field(default=None)
-    saveAs: str = 'dbBinary'
+    saveAs: str = field(default='Database')
 
     def __post_init__(self):
         if self.fileFormat is None:
@@ -83,7 +83,7 @@ class sharedFields(superFormat):
         #         self.sourceID = ''.join([random.choice(string.ascii_letters) for i in range(4)])
 
     def formatTraces(self):
-        if self.dataIntervalSeconds<1: self.outputFormat = 'highfrequency'
+        if self.dataIntervalSeconds<1: self.saveAs = 'ecf32'
         self.fileTimestamp = self.fileTimestamp.tz_localize(self.timezone)
         if self.sourceID is None:
             self.sourceID = f"{self.fileFormat}_{self.tableName}_{self.fileTimestamp.strftime('%Y%m%d%H%M')}"
@@ -103,7 +103,7 @@ class sharedFields(superFormat):
             if self.verbose:
                 self.logMessage(f"Total GPS induced offset in {self.fileName} is {Offset.iloc[-1]}s",verbose=False)
         if self.dataIntervalSeconds<1:
-            self.outputFormat = 'highfrequency'
+            self.saveAs = 'ecf32'
         
         
         # Any expected traces missing from the input file, generated as missing data
@@ -122,8 +122,8 @@ class sharedFields(superFormat):
         # drop nan rows
         self.dataTable = self.dataTable.dropna(how='all')
         if self.dataTable.empty:
-            self.outputFormat = None
-            return
+            self.saveAs = None
+            return None
         
         if self.dataIntervalSeconds is None:
             self.logError(f'Determine data interval or set to default for {self.fileFormat}')
@@ -131,7 +131,8 @@ class sharedFields(superFormat):
         if self.dataTable.index.duplicated().sum():
             self.logWarning(f"Duplicated indices at in position:\n{self.dataTable[self.dataTable.index.duplicated(keep=False)]}")
             self.dataTable = self.dataTable[~self.dataTable.index.duplicated()].copy()
-        self.dataTable = self.dataTable.resample(f"{self.dataIntervalSeconds}s").nearest()
+        if not self.saveAs == 'ecf32':
+            self.dataTable = self.dataTable.resample(f"{self.dataIntervalSeconds}s").nearest()
         if self.dataTable.index.unit=='us':
             #Default in pandas >=3.0
             posixtime_int64 = ((self.dataTable.index.astype(int)//1e6).values).astype('int64')
@@ -144,12 +145,3 @@ class sharedFields(superFormat):
         elif str(self.dataTable.index.tz) != self.timezone:
             self.logError('Mismatching timezones.  Add timezone converter here')
         self.logMessage('Set Date Range Parameter? No - Date range not necisarilly explicity enough?')
-        # if self.dateRange == self.__dataclass_fields__['dateRange'].default_factory():
-        #     self.dateRange = [self.dataTable.index.min().isoformat(),self.dataTable.index.max().isoformat()]
-        # else:
-        #     self.dateRange = pd.to_datetime(self.dateRange)
-        #     self.dateRange = [
-        #         min(self.dateRange[0],self.dataTable.index.min()).isoformat(),
-        #         max(self.dateRange[1],self.dataTable.index.max()).isoformat()
-        #     ]
-        # self.saveConfigFile(self.fileConfigPath)

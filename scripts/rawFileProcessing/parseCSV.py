@@ -49,7 +49,7 @@ class csvFile(sharedFields):
             self.header.append(HL)
         
         self.dataTable = pd.read_csv(rawFile,delimiter=self.delimiter,header=None,na_values=self.na_values)
-        rawFile.close()
+        # rawFile.close()
         self.dataTable = self.dataTable.dropna(how='all')
         if self.labelColumnBy == 'name':
             names = self.header[0]
@@ -58,11 +58,6 @@ class csvFile(sharedFields):
         self.typeMap[self.typeMap=='float64'] = 'float32'
         self.dataTable = self.dataTable.astype(self.typeMap)
         
-    def close(self):
-        if self.mode == 'identifyTraces':
-            self.formatTraces()
-        if self.mode == 'extractData':
-            self.formatTable()
 
 class NARRcsv(csvFile):
 
@@ -80,7 +75,7 @@ class NARRcsv(csvFile):
             self.traces = {i:rawTrace.from_dict(
                 {'originalVariable':variable,'units':unit,'dtype':self.typeMap[i]}).to_dict() for i,(siteID,variable,unit) in enumerate(zip(self.header[0],self.header[1],self.header[2])) if siteID == self.siteID}
 
-        self.close()
+        # self.close()
         # breakpoint()
 
 # @dataclass(kw_only=True)
@@ -106,7 +101,7 @@ class EddyProOutput(csvFile):
         )
         self.dataTable.index = TIMESTAMP 
 
-        self.close()
+        # self.close()
 # @dataclass(kw_only=True)
 class HOBOcsv(csvFile):
 
@@ -146,4 +141,4 @@ class HOBOcsv(csvFile):
             self.dataIntervalSeconds = self.dataTable.index.diff().median().total_seconds()
         # self.dataTable = self.dataTable.resample(f'{self.dataIntervalSeconds}s').asfreq()
 
-        self.close()
+        # self.close()

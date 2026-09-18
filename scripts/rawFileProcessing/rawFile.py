@@ -1,10 +1,10 @@
 from scripts.rawFileProcessing.parseCSV import EddyProOutput, HOBOcsv, NARRcsv
 from scripts.traceAnalysis.traceParameters import firstStageTrace
-from scripts.rawFileProcessing.parseCSI import TOB3, TOA5, MixedArray
 from scripts.database.database import database
 from ruamel.yaml.comments import CommentedSeq
 from scripts.ecf32.ecf32 import ecf32#ecf32Setup,ecf32Write
 # from helperFunctions.baseClass import mdMap
+from scripts.rawFileProcessing.processor import processor,getRawFileMetadata,readRawFileData
 from scripts.rawFileProcessing.sharedFields import sharedFields
 from scripts.ecf32.ghgMetadata import ghgMetadata
 from concurrent.futures import ProcessPoolExecutor
@@ -14,11 +14,8 @@ import pandas as pd
 import numpy as np
 import fnmatch
 import json
+import time
 import os
-
-processor = {
-    'TOB3':TOB3
-}
 
 @dataclass(kw_only=True)
 class discoverFiles(sharedFields):
@@ -27,6 +24,7 @@ class discoverFiles(sharedFields):
     fileName: str = None
     searchPath: str = None
     processFiles: bool = False
+    useParalell: bool = True
     ignoreFiles: list = field(default_factory=list)
     findFiles: list = field(default_factory=list)
 
@@ -37,51 +35,64 @@ class discoverFiles(sharedFields):
         fileInventoryPath = os.path.join(self.metaPath,'.inventory','fileInventory.json')
         fileSetPath = os.path.join(self.metaPath,'.inventory','fileSets.json')
         if os.path.isfile(fileInventoryPath):
-            self.inventory = self.loadDict(fileInventoryPath)
-            self.fileSets = pd.read_json(fileSetPath)
+            self.fileInventory = self.loadDict(fileInventoryPath)
+            self.fileSets = pd.DataFrame([self.loadDict(os.path.join(self.metaPath,k,f)+'.yml') for k,v in self.fileInventory.items() for f in v.keys()])
             self.fileSets['traces'] = [json.dumps(tr) for tr in self.fileSets['traces']]
-            self.inList = [f for v in self.inventory.values() for f in v]
+            self.inList = [f for v in self.fileInventory.values() for f in v]
         else:
             os.makedirs(os.path.join(self.metaPath,'.inventory'),exist_ok=True)
-            self.inventory = {}
+            self.fileInventory = {}
             self.fileSets = pd.DataFrame()
             self.inList = []
 
         if self.searchPath is not None:
             self.updateInventory()
-            for configFile,row in self.fileSets.iterrows():
-                configFile = os.path.sep.join(configFile)
+            for _,row in self.fileSets.iterrows():
                 row = row.to_dict()
-                row['traces'] = json.loads(row['traces'])
-                self.saveDict(row,os.path.join(self.metaPath,configFile))
-            with open(fileInventoryPath,'w+') as fout:
-                json.dump(self.inventory,fout)
-            self.fileSets['traces'] = [json.loads(tr) for tr in self.fileSets['traces']]
-            self.fileSets.to_json(fileSetPath)
-        
+                # pop, format, and move to end
+                traces = row.pop('traces')
+                row['traces'] = json.loads(traces)
+                self.saveDict(row,f"{os.path.join(self.metaPath,row['saveAs'],row['sourceID'])}.yml")
+            self.saveDict(self.fileInventory,fileInventoryPath)
+
         if self.processFiles:
             self.formatIni()
-            if 'Database' in self.inventory and len(self.inventory['Database']):
-                self.uploadDatabase()
-            if 'highfrequency' in self.inventory and len(self.inventory['highfrequency']):
-                self.uploadHighFrequency()
+            T1 = time.time()
+            for sourceID,fileList in self.fileInventory['Database'].items():
+                fileMetadata = self.loadDict(os.path.join(self.metaPath,'Database',f"{sourceID}.yml"))
+                reader = partial(readRawFileData,fileFormat=self.fileFormat,fileMetadata=fileMetadata)
+                if not self.useParalell:
+                    dataTable = [reader(fileName=fileName) for fileName in fileList['fileName']]
+                else:
+                    with ProcessPoolExecutor() as executor:
+                        dataTable = [table for table in executor.map(reader,fileList['fileName'])]
+                processed = [True if t is not None else False for t in dataTable]
+                dataTable = pd.concat(dataTable)
+                self.uploadRawData(dataTable,self.siteID,os.path.join('raw',fileMetadata['sourceID']),fileMetadata['dataIntervalSeconds'])
+                if len(processed)!=len(fileList['fileName']):
+                    breakpoint()
+                self.fileInventory['Database'][sourceID]['processed']=processed
+
+            self.saveDict(self.fileInventory,fileInventoryPath)
+            self.logMessage(f'Upload completed in : {time.time()-T1} s')
+        
 
     def updateInventory(self):
         files = self.discovery()
         # Group by common configuration
-        self.fileSets = files.groupby(['outputFormat','configFile']).first()
+        self.fileSets = files.groupby(['saveAs','sourceID']).first().reset_index()
         files['processed'] = False
-        files = files[['configFile','fileName','outputFormat','processed','fileTimestamp']].groupby(['outputFormat','configFile']).agg(list).to_dict(orient='index')
+        files = files[['sourceID','fileName','saveAs','processed','fileTimestamp']].groupby(['saveAs','sourceID']).agg(list).to_dict(orient='index')
         for key,value in files.items():
-            if key[0] not in self.inventory:
-                self.inventory[key[0]] = {}
+            if key[0] not in self.fileInventory:
+                self.fileInventory[key[0]] = {}
 
-            if key[1] not in self.inventory[key[0]]:
-                self.inventory[key[0]][key[1]] = value
+            if key[1] not in self.fileInventory[key[0]]:
+                self.fileInventory[key[0]][key[1]] = value
             else:
-                self.inventory[key[0]][key[1]]['processed'] += [False for v in value['fileName'] if v not in self.inventory[key[0]][key[1]]['processed']]
-                self.inventory[key[0]][key[1]]['fileName'] += [v for v in value['fileName'] if v not in self.inventory[key[0]][key[1]]['fileName']]
-                self.inventory[key[0]][key[1]]['fileTimestamp'] += [v for v in value['fileTimestamp'] if v not in self.inventory[key[0]][key[1]]['fileName']]
+                self.fileInventory[key[0]][key[1]]['processed'] += [False for v in value['fileName'] if v not in self.fileInventory[key[0]][key[1]]['fileName']]
+                self.fileInventory[key[0]][key[1]]['fileName'] += [v for v in value['fileName'] if v not in self.fileInventory[key[0]][key[1]]['fileName']]
+                self.fileInventory[key[0]][key[1]]['fileTimestamp'] += [v for v in value['fileTimestamp'] if v not in self.fileInventory[key[0]][key[1]]['fileName']]
         
         
     def discovery(self):
@@ -96,20 +107,24 @@ class discoverFiles(sharedFields):
         if len(fileList) == 0 and len(self.fileSets) == 0:
             exit('No Files discoverd')
 
-        files = pd.DataFrame({f:self.getMetadata(f) for f in fileList}).T
+        T1 = time.time()
+        self.logMessage(f"Searching: {len(fileList)} files")
+        get = partial(getRawFileMetadata,
+                fileFormat=self.fileFormat,
+                siteID=self.siteID,
+                ignoreTraces=self.ignoreTraces)
+        if not self.useParalell:
+            files = pd.DataFrame({f:get(fileName=f) for f in fileList}).T
+        else:
+            with ProcessPoolExecutor() as executor:
+                files = pd.DataFrame({f:out for f,out in zip(fileList,executor.map(get,fileList))}).T
+        self.logMessage(f'Metadata extracted in : {time.time()-T1} s')
 
         # Remove unwated tables
         files = files.loc[((~files['tableName'].isin(self.ignoreFiles))&(files['fileFormat'].notna()))].copy()
-        # if len(self.ignoreFiles):
-        #     # Remove unwated tables
-        #     files = files.loc[~files['tableName'].isin(self.ignoreFiles)].copy()
-        # elif len(self.findFiles):
-        #     # Or only keep wated tables
-        #     files = files.loc[files['tableName'].isin(self.findFiles)].copy()
-
         files['fileName'] = files.index
         files['referenceFile'] = files['fileName']
-        files = pd.concat([self.fileSets,files])
+        files = pd.concat([self.fileSets,files],ignore_index=True)
         files['fileTimestamp'] = pd.to_datetime(files['fileTimestamp'])
         files = files.sort_values(by=['tableName','traces','fileTimestamp'])
         # It only matters if these columns are duplicated
@@ -117,50 +132,17 @@ class discoverFiles(sharedFields):
         duplicates = files[test].duplicated().values
         # Name reference and configuration yaml
         files['fileTimestamp'] = files['fileTimestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S%z')
-        files['configFile'] = files['sourceID']+'.yml'
         # Mask duplicates and ffill
-        files.loc[duplicates,['referenceFile','configFile']] = np.nan
-        files[['referenceFile','configFile']] = files[['referenceFile','configFile']].ffill()
+        files.loc[duplicates,['referenceFile','sourceID']] = np.nan
+        files[['referenceFile','sourceID']] = files[['referenceFile','sourceID']].ffill()
         return(files)
-    
-    def getMetadata(self,fpath):
-        print('?',fpath)
-        if self.fileFormat in processor.keys():
-            out = processor[self.fileFormat](
-                siteID=self.siteID,
-                fileName=fpath,
-                projectPath=None,
-                ignoreTraces=self.ignoreTraces,
-                renameTraces=self.renameTraces
-                )
-        else:
-            print(self.fileFormat)
-        out = out.to_dict()
-        if out['dataIntervalSeconds'] is None or out['dataIntervalSeconds'] <= 0:
-            out['saveAs'] = None
-        elif out['dataIntervalSeconds']<60:
-            out['saveAs'] = 'ecf32'
-        out['traces'] = json.dumps(out['traces'])
-        return(out)
-    
+        
     def formatIni(self):
         rawDatabase = self.siteConfig.ini['rawData']['Database']
-        rawHighfrequency = self.siteConfig.ini['rawData']['highfrequency']
+        rawHighfrequency = self.siteConfig.ini['rawData']['ecf32']
         first = self.siteConfig.ini['Processing']['FirstStage']
-
-        for i,file in self.fileSets.iterrows():
-            if file['sourceID'] not in rawDatabase and file['sourceID'] not in rawHighfrequency and file['saveAs'] is not None:
-
-                self.logMessage('Do thisss?')
-        # for i,file in self.fileSets.loc[self.fileSets['dataIntervalSeconds']<1].iterrows():
-        #     self.dateRange = [file['fileTimestamp'],None]
-        #     inputDates = CommentedSeq(self.dateRange)
-        #     inputDates.yaml_set_anchor(f'{file['sourceID']}.inputDates')
-        #     rawHighfrequency[file['sourceID']] = inputDates
-
-        # for i,file in self.fileSets.loc[self.fileSets['dataIntervalSeconds']>=1].iterrows():
-        #     if file['sourceID'] not in rawDatabase:
-
+        for _,file in self.fileSets.iterrows():
+            if file['saveAs'] == 'Database' and file['sourceID'] not in rawDatabase:
                 self.dateRange = [file['fileTimestamp'],None]
                 inputDates = CommentedSeq(self.dateRange)
                 inputDates.yaml_set_anchor(f'{file['sourceID']}.inputDates')
@@ -175,7 +157,9 @@ class discoverFiles(sharedFields):
                         notes='default time-trace (seconds since unix epoch)').to_dict()
                 else:
                     first[self.posixName]['inputFiles'][f"{file['sourceID']}.{self.posixName}"] = inputDates
-                for value in json.loads(file['traces']).values():
+                if type(file['traces']) is str:
+                    file['traces'] = json.loads(file['traces'])
+                for value in file['traces'].values():
                     inputFile = f"{file['sourceID']}.{value['variableName']}"
                     if value['ignore']:
                         continue
@@ -188,30 +172,40 @@ class discoverFiles(sharedFields):
                     elif inputFile not in first[value['variableName']]['inputFiles']:
                         first[value['variableName']]['inputFiles'][inputFile] = inputDates
                     else:
-                        print('????')
+                        print('Issue ????')
                         breakpoint()
-
-            # self.saveConfigFile(self.fileConfigPath)
+            elif file['saveAs'] == 'ecf32' and file['sourceID'] not in rawHighfrequency:
+                self.dateRange = [file['fileTimestamp'],None]
+                inputDates = CommentedSeq(self.dateRange)
+                inputDates.yaml_set_anchor(f'{file['sourceID']}.inputDates')
+                rawHighfrequency[file['sourceID']] = inputDates
+                
+            elif file['saveAs'] is None:
+                continue
+            elif file['sourceID'] not in rawDatabase and file['sourceID'] not in rawHighfrequency:
+                print('Issue ????')
         self.saveDict(self.siteConfig.ini,self.siteConfig.iniPath)
 
     def uploadDatabase(self):
-        for fileConfigName,files in self.inventory['Database'].items():
+        breakpoint()
+        for fileConfigName,files in self.fileInventory['Database'].items():
+            breakpoint()
             cfg = self.loadDict(os.path.join(self.metaPath,'Database',fileConfigName))
             for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
                 print(file,cfg['fileFormat'],cfg['dataIntervalSeconds'],cfg['saveAs'])
-                if cfg['saveAs'] == 'dbBinary':
-                    tbx = TOB3.from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
+                if cfg['saveAs'] == 'Database':
+                    breakpoint()
+                    tbx = processor[cfg['fileFormat']].from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
                     tbx.formatTable()
-                    print(tbx.dataTable)
                     self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['sourceID']),cfg['dataIntervalSeconds'])
-                    self.inventory['Database'][fileConfigName]['processed'][i]=True
+                    self.fileInventory['Database'][fileConfigName]['processed'][i]=True
                 elif cfg['saveAs'] == 'ecf32':
                     print('not writing ecf32')
                     pass
                     # self.ecf32Write(tbx.dataTable,cfg['traces'],cfg['dataIntervalSeconds'],self.siteID,cfg['tableName'])
 
     def uploadHighFrequency(self):
-        for fileConfigName, files in self.inventory['highfrequency'].items():
+        for fileConfigName, files in self.fileInventory['highfrequency'].items():
             fileConfig = self.loadDict(os.path.join(self.metaPath,'highfrequency',fileConfigName))
             # ghgMetadata.
             # kwargs = fileConfig | {'siteID':self.siteID,'projectPath':self.projectPath,'mode':'ecf32'}
@@ -225,7 +219,7 @@ class discoverFiles(sharedFields):
             #     sourceID=fileConfig['sourceID'],
             #     kwargs=self.siteConfig.to_dict()|fileConfig
             #     )
-            # self.inventory['highfrequency'][fileConfigName]['processed'][i]=True
+            # self.fileInventory['highfrequency'][fileConfigName]['processed'][i]=True
 
         #     basePath,metadata=ecf32Setup(self.highFrequencyPath,self.siteID,fileConfig['sourceID'],fileConfig['traces'],fileConfig['dataIntervalSeconds'])
         #     # breakpoint()
@@ -238,11 +232,11 @@ class discoverFiles(sharedFields):
         #     breakpoint()
         
 
-def mpTOB3(fileName,config,basePath,metadata):
-    if config['fileType']:
-        out = TOB3.from_dict(config|{'fileName':fileName})
-        out.formatTable()
-        ecf32Write(out.dataTable,metadata,basePath)
+# def mpTOB3(fileName,config,basePath,metadata):
+#     if config['fileType']:
+#         out = TOB3.from_dict(config|{'fileName':fileName})
+#         out.formatTable()
+#         ecf32Write(out.dataTable,metadata,basePath)
     # else:
     #     return None
 

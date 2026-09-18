@@ -8,10 +8,11 @@ from scripts.ecf32.ecf32 import ecf32#ecf32Setup,ecf32Write
 from scripts.rawFileProcessing.sharedFields import sharedFields
 from scripts.ecf32.ghgMetadata import ghgMetadata
 from concurrent.futures import ProcessPoolExecutor
-from functools import partial
 from dataclasses import dataclass, field
+from functools import partial
 import pandas as pd
 import numpy as np
+import fnmatch
 import json
 import os
 
@@ -52,7 +53,6 @@ class discoverFiles(sharedFields):
                 configFile = os.path.sep.join(configFile)
                 row = row.to_dict()
                 row['traces'] = json.loads(row['traces'])
-                breakpoint()
                 self.saveDict(row,os.path.join(self.metaPath,configFile))
             with open(fileInventoryPath,'w+') as fout:
                 json.dump(self.inventory,fout)
@@ -86,16 +86,26 @@ class discoverFiles(sharedFields):
         
     def discovery(self):
         suffix = {'TOB3':'.dat'}
-        fileList = [os.path.join(dir,file) for dir,_,files in os.walk(self.searchPath) for file in files if file.endswith(suffix[self.fileFormat]) and os.path.join(self.searchPath,file) not in self.inList and len(files)]
+        fileList = [
+            os.path.join(dir,file) for dir,_,files in os.walk(self.searchPath) 
+            for file in files 
+            if (file.endswith(suffix[self.fileFormat]) and os.path.join(self.searchPath,file) not in self.inList) and
+            (len(self.findFiles) == 0 or any([fnmatch.fnmatch(file,fnd) for fnd in self.findFiles])) and
+            (len(self.ignoreFiles) == 0 or not any([fnmatch.fnmatch(file,ign) for ign in self.ignoreFiles])) and
+            len(files)]
+        if len(fileList) == 0 and len(self.fileSets) == 0:
+            exit('No Files discoverd')
+
         files = pd.DataFrame({f:self.getMetadata(f) for f in fileList}).T
+
         # Remove unwated tables
         files = files.loc[((~files['tableName'].isin(self.ignoreFiles))&(files['fileFormat'].notna()))].copy()
-        if len(self.ignoreFiles):
-            # Remove unwated tables
-            files = files.loc[~files['tableName'].isin(self.ignoreFiles)].copy()
-        elif len(self.findFiles):
-            # Or only keep wated tables
-            files = files.loc[files['tableName'].isin(self.findFiles)].copy()
+        # if len(self.ignoreFiles):
+        #     # Remove unwated tables
+        #     files = files.loc[~files['tableName'].isin(self.ignoreFiles)].copy()
+        # elif len(self.findFiles):
+        #     # Or only keep wated tables
+        #     files = files.loc[files['tableName'].isin(self.findFiles)].copy()
 
         files['fileName'] = files.index
         files['referenceFile'] = files['fileName']
@@ -114,7 +124,7 @@ class discoverFiles(sharedFields):
         return(files)
     
     def getMetadata(self,fpath):
-        print(fpath)
+        print('?',fpath)
         if self.fileFormat in processor.keys():
             out = processor[self.fileFormat](
                 siteID=self.siteID,
@@ -139,7 +149,7 @@ class discoverFiles(sharedFields):
         first = self.siteConfig.ini['Processing']['FirstStage']
 
         for i,file in self.fileSets.iterrows():
-            if file['sourceID'] not in rawData and file['saveAs'] is not None:
+            if file['sourceID'] not in rawDatabase and file['sourceID'] not in rawHighfrequency and file['saveAs'] is not None:
 
                 self.logMessage('Do thisss?')
         # for i,file in self.fileSets.loc[self.fileSets['dataIntervalSeconds']<1].iterrows():

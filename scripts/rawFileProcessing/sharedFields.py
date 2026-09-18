@@ -68,6 +68,7 @@ class sharedFields(superFormat):
 
     startDate: datetime = field(default=None)
     stopDate: datetime = field(default=None)
+    saveAs: str = 'dbBinary'
 
     def __post_init__(self):
         if self.fileFormat is None:

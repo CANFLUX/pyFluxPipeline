@@ -27,7 +27,6 @@ df.to_csv('C:/Users/jskeeter/gsc-permafrost/neuralNetworkAnalysisTool/SCL_data.c
 
 # import numpy as np
 # df.loc[df['FCO2'].isna(),'FCO2_csi'] = np.nan
-# print(df[['H','LE','FCO2','FCH4','FCO2_csi']].groupby(df.index.month).mean())
 # df.to_csv('testing/SCL_data.csv',index_label='timestamp')
 # A = df.loc[df.index.month<=5,['FCO2','SW_IN_1_1_1','FCO2_csi','FCH4']].dropna(how='any').copy() 
 # fig = plt.figure()

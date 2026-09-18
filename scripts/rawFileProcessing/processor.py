@@ -1,0 +1,67 @@
+from scripts.rawFileProcessing.parseCSI import TOB3, TOA5, MixedArray
+# from dataclasses import dataclass, field
+import json
+import sys
+
+processor = {
+    'TOB3':TOB3,
+    'TOA5':TOA5
+}
+
+def check(fileFormat):
+    if fileFormat not in processor:
+        sys.exit(f'File format not supported: {fileFormat}')
+
+def getRawFileMetadata(
+    fileName: str,
+    fileFormat: str,
+    siteID: str,
+    ignoreTraces: list = [],
+    renameTraces: dict = {}
+    ):
+    check(fileFormat)
+    out = processor[fileFormat](
+        projectPath=None,
+        siteID=siteID,
+        fileName=fileName,
+        mode='identifyTraces',
+        ignoreTraces=ignoreTraces,
+        renameTraces=renameTraces
+        )
+    if out.dataIntervalSeconds is None or out.dataIntervalSeconds <= 0:
+        out.saveAs = None
+    elif out.dataIntervalSeconds<60:
+        out.saveAs = 'ecf32'
+
+    
+    out.formatTraces()
+    out.traces = json.dumps(out.traces)
+    return(out.to_dict())
+        
+def readRawFileData(
+    fileName: str,
+    fileFormat: str,
+    fileMetadata: dict = {},
+    ):
+     
+    check(fileFormat)
+    out = processor[fileFormat].from_dict(fileMetadata|{'projectPath':None,'fileName':fileName,'mode':'extractData'})
+    out.formatTable()
+    return(out.dataTable)
+
+    # if self.mode == 'extractData':
+    #     self.formatTable()
+
+    
+        # T1 = time.time()
+        # self.logMessage(f"Searching: {len(fileList)} files")
+        # get = partial(getRawFileMetadata,
+        #         fileFormat=self.fileFormat,
+        #         siteID=self.siteID,
+        #         ignoreTraces=self.ignoreTraces)
+        # if not self.useParalell:
+        #     files = pd.DataFrame({f:get(fileName=f) for f in fileList}).T
+        # else:
+        #     with ProcessPoolExecutor(max_workers=1) as executor:
+        #         files = pd.DataFrame({f:out for f,out in zip(fileList,executor.map(get,fileList))}).T
+        # self.logMessage(f'Metadata extracted in : {time.time()-T1} s')

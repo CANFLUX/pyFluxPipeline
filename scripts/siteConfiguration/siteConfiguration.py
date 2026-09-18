@@ -26,7 +26,7 @@ rawDefault = {
 # rawData["sourceID.TA"]=(rawData["sourceID.TA"]-32)*5/9'''
          ),
     'Database':{},
-    'highfrequency':{}}
+    'ecf32':{}}
 
 @dataclass(kw_only=True)
 class configTemplate:

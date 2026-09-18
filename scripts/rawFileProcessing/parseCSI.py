@@ -33,11 +33,6 @@ class csiTable(sharedFields):
         self.serialNumber=self.header[0][3]
         self.program=self.header[0][5]
 
-    def close(self):
-        if self.mode == 'identifyTraces':
-            self.formatTraces()
-        if self.mode == 'extractData':
-            self.formatTable()
 
 class TOA5(csiTable):
 
@@ -59,7 +54,7 @@ class TOA5(csiTable):
         if self.traces == {}:
             typeMap = self.dataTable.dtypes
             self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable]).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
-        self.close()
+        # self.close()
 
 class TOB3(csiTable):
 
@@ -105,7 +100,7 @@ class TOB3(csiTable):
                 self.readFrames(fileObject.read())
             else:
                 self.startDate,self.stopDate = self.readFrames(fileObject.read(),firstLast=True)
-        self.close()
+        # self.close()
 
     def translateTypes(self,dtypes):
         csiTypeMap = {
@@ -246,7 +241,7 @@ class MixedArray(csiTable):
             self.readArray()
     
     def readDEF(self):
-        self.sourceID = self.fileFormat+'_'+os.path.split(self.templateFile)[-1].split('.')[0]
+        # self.sourceID = self.fileFormat+'_'+os.path.split(self.templateFile)[-1].split('.')[0]
         with open(self.templateFile,'r',encoding='utf-8-sig') as f:
             lines = f.readlines()
         Header,header = '',True

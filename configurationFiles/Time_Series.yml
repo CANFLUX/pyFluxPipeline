@@ -1,0 +1,3 @@
+fileFormat: TOB3
+findFiles:
+- '*Time_Series*'

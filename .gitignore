@@ -4,3 +4,4 @@ __pycache__
 projectPath
 testing
 !testing/data/
+requirements.txt

@@ -145,7 +145,7 @@ class discoverFiles(sharedFields):
             if file['saveAs'] == 'Database' and file['sourceID'] not in rawDatabase:
                 self.dateRange = [file['fileTimestamp'],None]
                 inputDates = CommentedSeq(self.dateRange)
-                inputDates.yaml_set_anchor(f'{file['sourceID']}.inputDates')
+                inputDates.yaml_set_anchor(f'{file["sourceID"]}.inputDates')
                 rawDatabase[file['sourceID']] = inputDates
                 if self.posixName not in first:
                     first[self.posixName] = firstStageTrace(
@@ -177,7 +177,7 @@ class discoverFiles(sharedFields):
             elif file['saveAs'] == 'ecf32' and file['sourceID'] not in rawHighfrequency:
                 self.dateRange = [file['fileTimestamp'],None]
                 inputDates = CommentedSeq(self.dateRange)
-                inputDates.yaml_set_anchor(f'{file['sourceID']}.inputDates')
+                inputDates.yaml_set_anchor(f'{file["sourceID"]}.inputDates')
                 rawHighfrequency[file['sourceID']] = inputDates
                 
             elif file['saveAs'] is None:

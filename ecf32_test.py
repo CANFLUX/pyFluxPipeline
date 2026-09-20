@@ -64,16 +64,15 @@ with open('configurationFiles/Time_Series.yml','w+') as f:
 
 with open('configurationFiles/Time_Series.yml') as f:
     Time_Series = yaml.safe_load(f)
-import multiprocessing as mp
 if __name__ == '__main__' and reset:
     mp.set_start_method('spawn', force=True) 
     SeepFlux = discoverFiles(
         projectPath=projectPath,
         siteID='SEEP',
-        searchPath=data_dump+'/RDEC1/2026/20260614',        
+        searchPath=data_dump+'/RDEC1/2026',#/20260614',        
         # processFiles=True,
         # useParalell=False,
-        **Time_Series
+        **CSFormat
         )
     fs = firstStage(projectPath=projectPath,sites='SEEP',years=[2026])
     # breakpoint()

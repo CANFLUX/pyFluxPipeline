@@ -1,0 +1,1 @@
+python -m main --projectPath testing/testProject --sites configurationFiles/SCL_template.yml

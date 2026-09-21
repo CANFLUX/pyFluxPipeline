@@ -28,11 +28,6 @@ def getRawFileMetadata(
         ignoreTraces=ignoreTraces,
         renameTraces=renameTraces
         )
-    if out.dataIntervalSeconds is None or out.dataIntervalSeconds <= 0:
-        out.saveAs = None
-    elif out.dataIntervalSeconds<60:
-        out.saveAs = 'ecf32'
-
     
     out.formatTraces()
     out.traces = json.dumps(out.traces)
@@ -43,7 +38,7 @@ def readRawFileData(
     fileFormat: str,
     fileMetadata: dict = {},
     ):
-     
+    if fileName is None: return(None)
     check(fileFormat)
     out = processor[fileFormat].from_dict(fileMetadata|{'projectPath':None,'fileName':fileName,'mode':'extractData'})
     out.formatTable()
@@ -59,7 +54,7 @@ def readRawFileData(
         #         fileFormat=self.fileFormat,
         #         siteID=self.siteID,
         #         ignoreTraces=self.ignoreTraces)
-        # if not self.useParalell:
+        # if not self.useParallel:
         #     files = pd.DataFrame({f:get(fileName=f) for f in fileList}).T
         # else:
         #     with ProcessPoolExecutor(max_workers=1) as executor:

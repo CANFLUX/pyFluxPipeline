@@ -68,7 +68,7 @@ class sharedFields(superFormat):
 
     startDate: datetime = field(default=None)
     stopDate: datetime = field(default=None)
-    saveAs: str = field(default='Database')
+    saveAs: str = field(default=None)
 
     def __post_init__(self):
         if self.fileFormat is None:
@@ -78,12 +78,11 @@ class sharedFields(superFormat):
             self.fileExtension = formats[self.fileFormat]
         super().__post_init__()
 
-        # if self.sourceID is None:
-        #     if self.tableName is None:
-        #         self.sourceID = ''.join([random.choice(string.ascii_letters) for i in range(4)])
-
     def formatTraces(self):
-        if self.dataIntervalSeconds<1: self.saveAs = 'ecf32'
+        if self.dataIntervalSeconds > 60:
+            self.saveAs = 'Database'
+        elif self.dataIntervalSeconds > 0 and self.dataIntervalSeconds<60:
+            self.saveAs = 'ecf32'
         self.fileTimestamp = self.fileTimestamp.tz_localize(self.timezone)
         if self.sourceID is None:
             self.sourceID = f"{self.fileFormat}_{self.tableName}_{self.fileTimestamp.strftime('%Y%m%d%H%M')}"
@@ -94,15 +93,16 @@ class sharedFields(superFormat):
                 if trace['originalVariable'] in self.renameTraces:
                     trace['variableName'] = self.renameTraces[trace['variableName']]
 
-    def formatTable(self):
-        
+    def formatTable(self):        
         if hasattr(self,'gpsDriftCorrection') and self.gpsDriftCorrection:
             # Identify gaps in time series
             Offset = (self.dataTable.index.diff().fillna(self.dataIntervalSeconds)-self.dataIntervalSeconds).cumsum()
             self.dataTable.index -= Offset
             if self.verbose:
                 self.logMessage(f"Total GPS induced offset in {self.fileName} is {Offset.iloc[-1]}s",verbose=False)
-        if self.dataIntervalSeconds<1:
+        if self.dataIntervalSeconds == 0:
+            self.saveAs = None
+        elif self.dataIntervalSeconds<1:
             self.saveAs = 'ecf32'
         
         

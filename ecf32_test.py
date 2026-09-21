@@ -71,7 +71,7 @@ if __name__ == '__main__' and reset:
         siteID='SEEP',
         searchPath=data_dump+'/RDEC1/2026',#/20260614',        
         # processFiles=True,
-        # useParalell=False,
+        # useParallel=False,
         **CSFormat
         )
     fs = firstStage(projectPath=projectPath,sites='SEEP',years=[2026])

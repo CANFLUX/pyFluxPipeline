@@ -10,7 +10,9 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 import struct
+import psutil
 import json
+import time
 import re
 import os
 
@@ -96,11 +98,20 @@ class TOB3(csiTable):
                     if len([t for t in tIn if t not in tEx]):
                         self.logError(f"Unexpected traces in {self.fileName}:\n{[t for t in tIn if t not in tEx]} are not defined in configuration file")
                 self.tracesIn = list(tracesIn.keys())
+            self.frameParameters()
+            self.streamFrames(fileObject)
             if self.mode == 'extractData':
-                self.readFrames(fileObject.read())
+                # Read full file
+                self.streamFrames(fileObject)
             else:
-                self.startDate,self.stopDate = self.readFrames(fileObject.read(),firstLast=True)
-        # self.close()
+                if self.dataIntervalSeconds == 0:
+                    # Don't bother reading if data Interval not specified
+                    self.startDate,self.stopDate = None,None
+                else:
+                    # Only get first/last timestamp
+                    # For high frequency, read at 1s intervals if only exacting dates
+                    stepSize = int(1/min(1,self.dataIntervalSeconds))
+                    self.startDate,self.stopDate = self.streamFrames(fileObject,stepSize)
 
     def translateTypes(self,dtypes):
         csiTypeMap = {
@@ -123,36 +134,31 @@ class TOB3(csiTable):
         self.byteMap = ''.join(self.byteMap)
         return(pyTypes)
 
-
-    def readFrames(self,binaryData,firstLast=False):
-        # Parameters dictating extraction  
+    def frameParameters(self):
         self.recordSize = struct.calcsize('>'+self.byteMap)
         self.recordsPerFrame = int((self.frameSize-self.headerSize-self.footerSize)/self.recordSize)
         self.byteMap_Body = '>'+''.join([self.byteMap for r in range(self.recordsPerFrame)])
-        # Extract the binary data
-        
-        tracesIn = {key:self.traces[key] for key in self.tracesIn}
-        if firstLast:
-            if self.dataIntervalSeconds == 0:
-                return(None,None)
-            elif self.dataIntervalSeconds < 1:
-                # Sample at 1sec resolutoin for expediency to identify the "last" (almost) record
-                frames = [f for i in range(0,self.nframes,int(1/min(1,self.dataIntervalSeconds))) for f in 
-                    self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
-            else:
-                frames = [f for i in range(self.nframes) for f in 
-                    self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
 
-            if len(frames)>1:
-                return(
-                    pd.to_datetime((frames[0][0]*1e9)+frames[0][1],unit='ns').floor(freq='1s').to_pydatetime(),
-                    pd.to_datetime((frames[-1][0]*1e9)+frames[-1][1],unit='ns').ceil(freq='1s').to_pydatetime(),
-                    )
-            else:
-                return(None,None)
-        # Process frame by frame
-        frames = [f for i in range(self.nframes) for f in 
-                self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
+    def streamFrames(self,fileObject,stepSize=1):
+        T1 = time.time()
+        pad = fileObject.tell()
+        frames = []
+        for i in range(0,self.nframes,stepSize):
+            if stepSize>1:
+                fileObject.seek(self.frameSize*i+pad)
+            out = self.decodeFrame(fileObject.read(self.frameSize))
+            if out == []:
+                break
+            for row in out:
+                frames.append(row)
+        if len(frames) == 0:
+            return(None,None)
+        elif self.mode!='extractData':
+            return(
+                pd.to_datetime((frames[0][0]*1e9)+frames[0][1],unit='ns').floor(freq='1s').to_pydatetime(),
+                pd.to_datetime((frames[-1][0]*1e9)+frames[-1][1],unit='ns').ceil(freq='1s').to_pydatetime()
+            )
+        tracesIn = {key:self.traces[key] for key in self.tracesIn}
         dataTable = pd.DataFrame(frames,columns=list(self.indexColumns.keys())+list(tracesIn.keys()))
         # Separate indices (parsed from headers) from traces
         self.indexTraces = dataTable[list(self.indexColumns.keys())].astype(
@@ -170,13 +176,72 @@ class TOB3(csiTable):
                 {key:var['dtype'] for key,var in tracesIn.items()}
             )
         except Exception as e:
-            self.logWarning(f'Dtype enforcment failed with error: {e}')
+            self.logWarning(f'Dtype enforcement failed with error: {e}')
             self.logMessage('Proceeding with errors = ignore')
             self.dataTable = dataTable[list(tracesIn.keys())].astype(
                 {key:var['dtype'] for key,var in tracesIn.items()},
                 errors='ignore'
             )
         self.dataTable.index=pd.to_datetime((self.indexTraces['POSIX_Time']*1e9).astype('int64')+self.indexTraces['NANOSECONDS'],unit='ns') 
+    
+        # self.logMessage(f'Completed in : {time.time()-T1} s')
+        # breakpoint()
+
+
+    # def readFrames(self,binaryData,firstLast=False):
+    #     # Parameters dictating extraction  
+    #     # self.recordSize = struct.calcsize('>'+self.byteMap)
+    #     # self.recordsPerFrame = int((self.frameSize-self.headerSize-self.footerSize)/self.recordSize)
+    #     # self.byteMap_Body = '>'+''.join([self.byteMap for r in range(self.recordsPerFrame)])
+    #     # Extract the binary data
+            
+    #     tracesIn = {key:self.traces[key] for key in self.tracesIn}
+    #     if firstLast:
+    #         if self.dataIntervalSeconds == 0:
+    #             return(None,None)
+    #         elif self.dataIntervalSeconds < 1:
+    #             # Sample at 1sec resolutoin for expediency to identify the "last" (almost) record
+    #             frames = [f for i in range(0,self.nframes,int(1/min(1,self.dataIntervalSeconds))) for f in 
+    #                 self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
+    #         else:
+    #             frames = [f for i in range(self.nframes) for f in 
+    #                 self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
+
+    #         if len(frames)>1:
+    #             return(
+    #                 pd.to_datetime((frames[0][0][0]*1e9)+frames[0][0][1],unit='ns').floor(freq='1s').to_pydatetime(),
+    #                 pd.to_datetime((frames[-1][0][0]*1e9)+frames[-1][0][1],unit='ns').ceil(freq='1s').to_pydatetime(),
+    #                 )
+    #         else:
+    #             return(None,None)
+      
+    #     # Process frame by frame
+    #     frames = [f for i in range(self.nframes) for f in 
+    #             self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
+    #     dataTable = pd.DataFrame(frames,columns=list(self.indexColumns.keys())+list(tracesIn.keys()))
+    #     # Separate indices (parsed from headers) from traces
+    #     self.indexTraces = dataTable[list(self.indexColumns.keys())].astype(
+    #         {key:var['dtype'] for key,var in self.indexColumns.items()}
+    #     )
+    #     if self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated().sum():
+    #         self.logWarning(f"Duplicated timestamps found in {self.fileName} at\n{self.indexTraces[self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)]}\n Replicated indices will be offset by 1ns*(counter) to avoid conflicts")
+    #         ix = self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)
+    #         rix = self.indexTraces.loc[ix,'RECORD'].astype('int32')
+    #         self.indexTraces.loc[ix,'NANOSECONDS'] += (rix-(rix.min()+1))
+    #         if self.dataIntervalSeconds<1 and self.dataIntervalSeconds > 0:
+    #             self.logError('develop better approach?')
+    #     try:
+    #         self.dataTable = dataTable[list(tracesIn.keys())].astype(
+    #             {key:var['dtype'] for key,var in tracesIn.items()}
+    #         )
+    #     except Exception as e:
+    #         self.logWarning(f'Dtype enforcment failed with error: {e}')
+    #         self.logMessage('Proceeding with errors = ignore')
+    #         self.dataTable = dataTable[list(tracesIn.keys())].astype(
+    #             {key:var['dtype'] for key,var in tracesIn.items()},
+    #             errors='ignore'
+    #         )
+    #     self.dataTable.index=pd.to_datetime((self.indexTraces['POSIX_Time']*1e9).astype('int64')+self.indexTraces['NANOSECONDS'],unit='ns') 
     
     def decodeFrame(self,frame):
         frame = [struct.unpack('iii', frame[:self.headerSize]),

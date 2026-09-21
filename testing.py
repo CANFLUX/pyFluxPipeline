@@ -69,10 +69,21 @@ if __name__ == '__main__':
     SeepFlux = discoverFiles(
         projectPath=projectPath,
         siteID='SEEP',
-        searchPath=data_dump+'/RDEC1/2026',#/20260614',        
-        # processFiles=True,
-        # useParalell=False,
+        searchPath=data_dump+'/RDEC1/2026/20260614',        
+        processFiles=True,
+        # useParallel=False,
+        **CSFormat
+        # **{'fileFormat':'TOB3'}
+        )
+    breakpoint()
+    SeepFlux = discoverFiles(
+        projectPath=projectPath,
+        siteID='SEEP',
+        searchPath=data_dump+'/RDEC1/2026/20260614',        
+        processFiles=True,
+        useParallel=False,
         **Time_Series
+        # **{'fileFormat':'TOB3'}
         )
     fs = firstStage(projectPath=projectPath,sites='SEEP',years=[2026])
 

@@ -49,7 +49,6 @@ class discoverFiles(sharedFields):
             self.saveDict(self.fileInventory,self.fileInventoryPath)
             self.logMessage(f'Upload completed in : {time.time()-T1} s')
 
-        
     def updateInventory(self):
         # Find new files
         files = self.fileSearch()
@@ -71,8 +70,10 @@ class discoverFiles(sharedFields):
         for _,row in self.fileSets.iterrows():
             row = row.to_dict()
             # pop, format, and move to end
-            traces = row.pop('traces')
-            row['traces'] = json.loads(traces)
+            # traces = row.pop('traces')
+            row['traces'] = json.loads(row['traces'])
+            if row['saveAs'] == 'ecf32':
+                self.ecf32Metadata(kwargs=row)
             self.saveDict(row,f"{os.path.join(self.metaPath,row['saveAs'],row['sourceID'])}.yml")
         self.saveDict(self.fileInventory,self.fileInventoryPath)
         
@@ -93,15 +94,16 @@ class discoverFiles(sharedFields):
 
         T1 = time.time()
         self.logMessage(f"Searching: {len(fileList)} files")
-        get = partial(getRawFileMetadata,
+        reader = partial(getRawFileMetadata,
+                projectPath=self.projectPath,
                 fileFormat=self.fileFormat,
                 siteID=self.siteID,
                 ignoreTraces=self.ignoreTraces)
         if not self.useParallel:
-            files = pd.DataFrame({f:get(fileName=f) for f in fileList}).T
+            files = pd.DataFrame({f:reader(fileName=f) for f in fileList}).T
         else:
             with ProcessPoolExecutor() as executor:
-                files = pd.DataFrame({f:out for f,out in zip(fileList,executor.map(get,fileList))}).T
+                files = pd.DataFrame({f:out for f,out in zip(fileList,executor.map(reader,fileList))}).T
         self.logMessage(f'Metadata extracted in : {time.time()-T1} s')
 
         # Remove unwanted tables
@@ -183,7 +185,7 @@ class discoverFiles(sharedFields):
             print(sourceID)
             # Load the metadata and format the batch reader
             fileMetadata = self.loadDict(os.path.join(self.metaPath,outputFormat,f"{sourceID}.yml"))
-            reader = partial(readRawFileData,fileFormat=self.fileFormat,fileMetadata=fileMetadata)
+            reader = partial(readRawFileData,projectPath=self.projectPath,fileFormat=self.fileFormat,fileMetadata=fileMetadata)
             # Submit the job (parallel) is preferred except when debugging
             if not self.useParallel:
                 dataTable = [reader(fileName=fileName) for fileName in fileList]
@@ -195,7 +197,8 @@ class discoverFiles(sharedFields):
             if outputFormat == 'Database':
                 self.uploadRawData(dataTable,self.siteID,os.path.join('raw',fileMetadata['sourceID']),fileMetadata['dataIntervalSeconds'])
             # else:
-        breakpoint()
+            elif outputFormat == 'ecf32':
+                breakpoint()
         #     if len(processed)!=len(fileList['fileName']):
         #         breakpoint()
         #     self.fileInventory['Database'][sourceID]['processed']=processed
@@ -207,7 +210,17 @@ class discoverFiles(sharedFields):
 #             for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
 #                 print(file,cfg['fileFormat'],cfg['dataIntervalSeconds'],cfg['saveAs'])
 #                 if cfg['saveAs'] == 'Database':
-#                     breakpoint()
+#
+# 
+# 
+# 
+# 
+# 
+# 
+# dsfa
+# 
+# 
+# dddddfadfffffdddddddddkpoint()
 #                     tbx = processor[cfg['fileFormat']].from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
 #                     tbx.formatTable()
 #                     self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['sourceID']),cfg['dataIntervalSeconds'])

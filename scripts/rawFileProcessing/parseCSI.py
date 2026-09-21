@@ -47,6 +47,7 @@ class TOA5(csiTable):
             if self.fileFormat is None:
                 return
             self.fileTimestamp = datetime.strptime(re.search(r'([0-9]{4}\_[0-9]{2}\_[0-9]{2}\_[0-9]{4})', self.fileName.rsplit('.',1)[0]).group(0),'%Y_%m_%d_%H%M')
+            self.startTime = self.fileTimestamp
             self.tableName = self.header[0][-1]
             defaultTypes = defaultdict(lambda: '<f4',RECORD ='<u4',TIMESTAMP = 'str')
             self.dataTable = pd.read_csv(fileObject,dtype=defaultTypes,names=self.header[1])
@@ -76,6 +77,7 @@ class TOB3(csiTable):
                 self.fileFormat = None
                 return
             self.fileTimestamp = pd.to_datetime(self.header[0][-1])
+            self.startTime = self.fileTimestamp
             self.tableName = self.header[1][0]
             self.dataIntervalSeconds = pd.to_timedelta(parseFrequency(self.header[1][1])).total_seconds()
             self.frameSize = int(self.header[1][2])
@@ -98,20 +100,12 @@ class TOB3(csiTable):
                     if len([t for t in tIn if t not in tEx]):
                         self.logError(f"Unexpected traces in {self.fileName}:\n{[t for t in tIn if t not in tEx]} are not defined in configuration file")
                 self.tracesIn = list(tracesIn.keys())
-            self.frameParameters()
-            self.streamFrames(fileObject)
             if self.mode == 'extractData':
+                self.frameParameters()
                 # Read full file
                 self.streamFrames(fileObject)
-            else:
-                if self.dataIntervalSeconds == 0:
-                    # Don't bother reading if data Interval not specified
-                    self.startDate,self.stopDate = None,None
-                else:
-                    # Only get first/last timestamp
-                    # For high frequency, read at 1s intervals if only exacting dates
-                    stepSize = int(1/min(1,self.dataIntervalSeconds))
-                    self.startDate,self.stopDate = self.streamFrames(fileObject,stepSize)
+            # else:
+                # Strategy for getting stop time without reading full file?  getmtime doesn't work because its not guranteed to be in same tz as logger
 
     def translateTypes(self,dtypes):
         csiTypeMap = {

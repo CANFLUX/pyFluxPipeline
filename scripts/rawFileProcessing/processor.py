@@ -13,6 +13,7 @@ def check(fileFormat):
         sys.exit(f'File format not supported: {fileFormat}')
 
 def getRawFileMetadata(
+    projectPath: str,
     fileName: str,
     fileFormat: str,
     siteID: str,
@@ -21,7 +22,7 @@ def getRawFileMetadata(
     ):
     check(fileFormat)
     out = processor[fileFormat](
-        projectPath=None,
+        projectPath=projectPath,
         siteID=siteID,
         fileName=fileName,
         mode='identifyTraces',
@@ -34,13 +35,14 @@ def getRawFileMetadata(
     return(out.to_dict())
         
 def readRawFileData(
+    projectPath: str,
     fileName: str,
     fileFormat: str,
     fileMetadata: dict = {},
     ):
     if fileName is None: return(None)
     check(fileFormat)
-    out = processor[fileFormat].from_dict(fileMetadata|{'projectPath':None,'fileName':fileName,'mode':'extractData'})
+    out = processor[fileFormat].from_dict(fileMetadata|{'projectPath':projectPath,'fileName':fileName,'mode':'extractData'})
     out.formatTable()
     return(out.dataTable)
 

@@ -1,3 +1,5 @@
 fileFormat: TOB3
 findFiles:
 - '*Time_Series*'
+ignoreTraces:
+- milliseconds_LI7700

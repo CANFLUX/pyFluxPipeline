@@ -1,27 +1,25 @@
-from scripts.siteConfiguration.siteConfiguration import siteConfiguration
-from helperFunctions.baseClass import mdMap
+# from scripts.siteConfiguration.siteConfiguration import siteConfiguration
+# from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass, field
-from scripts.project import defaultSettings
+from scripts.project import project
+# from scripts.defaultSettings import defaultSettings
 import pandas as pd
 import numpy as np
 import shutil
 import os
 
-
-
 @dataclass(kw_only=True)
-class database(defaultSettings):
-
-    projectPath: str = field(repr=False,metadata=mdMap('Root path of the current project'))
+class database(project):
     sitesList: list = field(default_factory=list,repr=False)
-    # siteInventory: dict = field(init=False,default_factory=dict,repr=False)
 
     def __post_init__(self):  
         super().__post_init__()
+        # breakpoint()
         if self.projectPath is None:
-            return
+        #     return
+            breakpoint()
         self.databasePath = os.path.join(self.projectPath,'Database')
-        self.highFrequencyPath = os.path.join(self.projectPath,'HighFrequencyData')
+        # self.highFrequencyPath = os.path.join(self.projectPath,'HighFrequencyData')
         if self.sitesList == []:
             self.sitesList = [pth for pth in os.listdir(os.path.join(self.projectPath,'Sites'))]
 
@@ -64,13 +62,13 @@ class database(defaultSettings):
         return(pd.Series({ts:i+1970 for i,ts in enumerate(timestamp)},name='Year'))
 
 
-    def loadSiteConfiguration(self,siteID):
-        return(
-            siteConfiguration.from_yaml(
-                os.path.join(self.projectPath,'Sites',siteID,"siteMetadata.yml"),
-                kwargs={'projectPath':self.projectPath}
-                )
-            )
+    # def loadSiteConfiguration(self,siteID):
+    #     return(
+    #         siteConfiguration.from_yaml(
+    #             os.path.join(self.projectPath,'Sites',siteID,"siteMetadata.yml"),
+    #             kwargs={'projectPath':self.projectPath}
+    #             )
+    #         )
 
     def writeTrace(self,trace,filePath):
         dtype = str(trace.dtype)

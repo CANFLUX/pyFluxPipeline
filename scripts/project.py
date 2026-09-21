@@ -1,20 +1,28 @@
-from datetime import datetime
+import os
+import pandas as pd
 from dataclasses import field, dataclass
-from helperFunctions.baseClass import baseDataClass, mdMap
+# from helperFunctions.baseClass import baseDataClass, mdMap
+from scripts.defaultSettings import defaultSettings
+from scripts.siteConfiguration.siteConfiguration import siteConfiguration
 
 @dataclass(kw_only=True)
-class project(baseDataClass):
-    projectPath: str = field(repr=False,metadata=mdMap('Root path of the current project'))
+class project(defaultSettings):
 
-
-@dataclass
-class defaultSettings(project):
-    dataIntervalSeconds: float = 1800.0 # Defaults to 1800s (30 min) for the database, however any format is acceptable for a given database folder
-    timezone: str = 'UTC' # defaults to UTC for simplicity, but can be set to any timezone on a site or data-source specific basis
-    # posixYears = posixYears
-    intMask = -9999 # NO DATA value for integer data
-    defaultDataType = 'float32' # Any numeric type acceptable, float32 & int32 preferred for optimizing precisions vs. storage requirements
-    posixName = 'posix_time' # Filename of python time-trace (stored in posix format with int64 dtype)
-    datenumName = 'clean_tv' # Legacy variable to allow interoperability of generated database with Biomet.net
-    
-    currentYear = datetime.now().year
+    def loadSiteConfiguration(self,siteID,sensorGropus=False):
+        if not sensorGropus:
+            return(
+                siteConfiguration.from_yaml(
+                    os.path.join(self.projectPath,'Sites',siteID,"siteMetadata.yml"),
+                    kwargs={'projectPath':self.projectPath}
+                    )
+                )
+        else:
+            config = siteConfiguration.from_yaml(
+                                os.path.join(self.projectPath,'Sites',siteID,"siteMetadata.yml"),
+                                kwargs={'projectPath':self.projectPath}
+                                )
+            sensorHistory = pd.read_csv(os.path.join(self.projectPath,'Sites',siteID,"sensorHistory.csv"),index_col=[0],parse_dates=[0])
+            sensorGroups = pd.read_csv(os.path.join(self.projectPath,'Sites',siteID,"sensorGroups.csv"),index_col=[0],parse_dates=[3,4,5,6],date_format='%Y-%m-%dT%H:%M:%S')
+            return(
+                config,sensorGroups,sensorHistory
+                )

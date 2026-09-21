@@ -7,7 +7,8 @@ import os
 
 @dataclass(kw_only=True)
 class createProject(database):
-    projectPath: str = field(metadata=mdMap('Root path of the current project'))
+    projectPath: str = field(repr=True)
+    # projectPath: str = field(metadata=mdMap('Root path of the current project'))
     sitesList: list = field(default_factory=lambda:['.templateSite'],metadata=mdMap('List of siteIDs'))
     # siteConfigTemplates: dict = field(default_factory=dict,repr=False)
     

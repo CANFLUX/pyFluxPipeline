@@ -87,9 +87,4 @@ class ghgMetadata(baseDataClass):
         breakpoint()
 
 
-    #     kl = list(self.Instruments.keys())
-    #     for key in kl:
-    #         kix = int(key.split('_')[1])
-    #         if kix>ix:
-    #             self.Instruments.pop(key)
    

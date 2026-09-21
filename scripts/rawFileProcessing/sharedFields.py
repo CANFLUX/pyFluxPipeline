@@ -1,4 +1,8 @@
 from scripts.database.database import database
+from scripts.ecf32.ecf32 import ecf32
+# from helperFunctions.baseClass import baseDataClass, mdMap
+# from scripts.defaultSettings import defaultSettings
+# from scripts.project import project
 from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass,field
 from datetime import datetime
@@ -17,29 +21,19 @@ formats = {
     'MixedArray':'dat',
     'NARRcsv':'csv'
 }
-superFormats = {
-    'HOBOcsv':None,
-    'EddyProOutput':'LICOR',
-    'GHG':'LICOR',
-    'TOB3':'CSI',
-    'TOA5':'CSI',
-    'MixedArray':'CSI',
-    'NARRcsv':None
-}
+# superFloormats = {
+#     'HOBOcsv':None,
+#     'EddyProOutput':'LICOR',
+#     'GHG':'LICOR',
+#     'TOB3':'CSI',
+#     'TOA5':'CSI',
+#     'MixedArray':'CSI',
+#     'NARRcsv':None
+# }
+
 
 @dataclass(kw_only=True)
-class superFormat(database):
-    mode: str = field(
-        default='identifyTraces',
-        repr=False,
-        metadata=mdMap('extract data or inspect header',options=['extractData','identifyTraces']))
- 
-
-    def __post_init__(self):
-        super().__post_init__()
-
-@dataclass(kw_only=True)
-class sharedFields(superFormat):
+class sharedFields(database,ecf32):
     fileName: str = field(repr=False)
     fileExtension: str = field(default=None,repr=False)
     na_values: str = field(default=None,repr=False)
@@ -69,6 +63,11 @@ class sharedFields(superFormat):
     startDate: datetime = field(default=None)
     stopDate: datetime = field(default=None)
     saveAs: str = field(default=None)
+    
+    mode: str = field(
+        default='identifyTraces',
+        repr=False,
+        metadata=mdMap('extract data or inspect header',options=['extractData','identifyTraces']))
 
     def __post_init__(self):
         if self.fileFormat is None:
@@ -100,33 +99,47 @@ class sharedFields(superFormat):
             self.dataTable.index -= Offset
             if self.verbose:
                 self.logMessage(f"Total GPS induced offset in {self.fileName} is {Offset.iloc[-1]}s",verbose=False)
-        if self.dataIntervalSeconds == 0:
+        if self.dataIntervalSeconds == 0 or self.dataIntervalSeconds is None:
             self.saveAs = None
-        elif self.dataIntervalSeconds<1:
-            self.saveAs = 'ecf32'
-        
-        
+            self.logMessage(f"Not saving {self.fileName}")
+            return None
+
         # Any expected traces missing from the input file, generated as missing data
         missingTraces = {key:value['dtype'] for key,value in self.traces.items() if key not in self.dataTable.columns}
         if len(missingTraces):
             self.logWarning(f'Missing expected traces in {self.fileName}, filling with nodata')
             missingTraces = self.noDataTable(self.dataTable.index,missingTraces)
             self.dataTable = pd.concat([self.dataTable,missingTraces],axis=1)
-
-        # Drop extra columns not included in traces definition
-        self.dataTable = self.dataTable.drop(columns = self.dataTable.columns[~self.dataTable.columns.isin(list(self.traces.keys()))])
         # rename columns according to traces
-        self.dataTable = self.dataTable.rename(columns = {key:value['variableName'] for key,value in self.traces.items()})
-        # drop ignore columns
-        self.dataTable = self.dataTable.drop(columns=[value['variableName'] for value in self.traces.values() if value['ignore'] if value['variableName'] in self.dataTable.columns])
+        renames = {key:value['variableName'] for key,value in self.traces.items()}
+        self.dataTable = self.dataTable.rename(columns = renames)
+        # Any traces we want to drop 1) not in template traces, or 2) listed in gnore
+        ignoreNames = [value['variableName'] for value in self.traces.values() if value['ignore'] and value['variableName'] in self.dataTable.columns]
+        dropTraces = list(self.dataTable.columns[~self.dataTable.columns.isin(list(renames.values()))]) + ignoreNames
+        self.dataTable = self.dataTable.drop(columns = dropTraces)
+
+
+        self.dataTable = self.dataTable.resample(f"{self.dataIntervalSeconds}s").nearest()
+        
+        if self.saveAs == 'ecf32':
+            self.getSegments(self.dataTable)
+            
+                
+        # if len(missingTraces):
+        #     self.logWarning(f'Missing expected traces in {self.fileName}, filling with nodata')
+        #     missingTraces = self.noDataTable(self.dataTable.index,missingTraces)
+        #     self.dataTable = pd.concat([self.dataTable,missingTraces],axis=1)
+
+        # # drop ignore columns
+        # self.dataTable = self.dataTable.drop(columns=[value['variableName'] for value in self.traces.values() if value['ignore'] if value['variableName'] in self.dataTable.columns])
         # drop nan rows
         self.dataTable = self.dataTable.dropna(how='all')
-        if self.dataTable.empty:
+        if self.dataTable.empty or self.dataIntervalSeconds == 0:
             self.saveAs = None
             return None
         
-        if self.dataIntervalSeconds is None:
-            self.logError(f'Determine data interval or set to default for {self.fileFormat}')
+        # elif self.dataIntervalSeconds is None:
+        #     self.logError(f'Determine data interval or set to default for {self.fileFormat}')
         # drop duplicated indexes (first considered valid)
         if self.dataTable.index.duplicated().sum():
             self.logWarning(f"Duplicated indices at in position:\n{self.dataTable[self.dataTable.index.duplicated(keep=False)]}")
@@ -144,4 +157,3 @@ class sharedFields(superFormat):
             self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)
         elif str(self.dataTable.index.tz) != self.timezone:
             self.logError('Mismatching timezones.  Add timezone converter here')
-        self.logMessage('Set Date Range Parameter? No - Date range not necisarilly explicity enough?')

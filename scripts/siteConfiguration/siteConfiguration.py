@@ -2,11 +2,12 @@ from scripts.siteConfiguration.hardware import dataLogger,sensor
 from helperFunctions.baseClass import spatialObject,mdMap
 from ruamel.yaml.scalarstring import LiteralScalarString
 from scripts.ecf32.ghgMetadata import ghgMetadata
-from scripts.project import defaultSettings
+from scripts.defaultSettings import defaultSettings
 from dataclasses import dataclass, field
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from zoneinfo import ZoneInfo
 import os
 
 @dataclass(kw_only=True)
@@ -81,10 +82,17 @@ class siteConfiguration(defaultSettings):
         dates = []
         for k,v in self.sensors.items():
             if v.dateOut is not None:
+                breakpoint()
+                if v.dateIn.tzinfo is None:
+                    self.logError('TZfuxup')
+                elif v.dateOut.tzinfo is None:
+                    v.dateOut.replace(tzinfo=ZoneInfo(v.dateIn.tzinfo))
+                print(v.dateIn,v.dateOut)
                 rng = pd.date_range(v.dateIn,v.dateOut,inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
             else:
                 rng = pd.date_range(v.dateIn,datetime.now(),inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
             dates.append(pd.DataFrame(index=rng,data={k:[k for i in range(rng.shape[0])]}))
+        breakpoint()
         self.sensorHistory = pd.concat(dates,axis=1).fillna('')
         self.sensorHistory['sensorGroup'] = self.sensorHistory.agg('_'.join,axis=1).str.replace(r'(_)\1+', '_', regex=True).str.strip('_')
         self.sensorHistory = self.sensorHistory[['sensorGroup']]

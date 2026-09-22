@@ -22,7 +22,7 @@ class project(defaultSettings):
                                 kwargs={'projectPath':self.projectPath}
                                 )
             sensorHistory = pd.read_csv(os.path.join(self.projectPath,'Sites',siteID,"sensorHistory.csv"),index_col=[0],parse_dates=[0])
-            sensorGroups = pd.read_csv(os.path.join(self.projectPath,'Sites',siteID,"sensorGroups.csv"),index_col=[0],parse_dates=[3,4,5,6],date_format='%Y-%m-%dT%H:%M:%S')
+            sensorGroups = pd.read_csv(os.path.join(self.projectPath,'Sites',siteID,"sensorGroups.csv"),header=[0,1],index_col=[0],parse_dates=[3,4,5,6],date_format='%Y-%m-%dT%H:%M:%S%z')
             return(
                 config,sensorGroups,sensorHistory
                 )

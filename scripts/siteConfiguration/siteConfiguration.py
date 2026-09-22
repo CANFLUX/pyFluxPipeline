@@ -81,18 +81,18 @@ class siteConfiguration(defaultSettings):
             self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,"siteMetadata.yml"))
         dates = []
         for k,v in self.sensors.items():
+            if v.dateIn.tzinfo is None:
+                self.logError(f'Error in {self.siteID}: dateIn:{v.dateIn}, must specify UTC offset in yaml timestamp, e.g., +00:00, -06:00, etc. ')
             if v.dateOut is not None:
-                breakpoint()
-                if v.dateIn.tzinfo is None:
-                    self.logError('TZfuxup')
-                elif v.dateOut.tzinfo is None:
-                    v.dateOut.replace(tzinfo=ZoneInfo(v.dateIn.tzinfo))
-                print(v.dateIn,v.dateOut)
+                if v.dateOut.tzinfo is None:
+                    self.logError(f'Error in {self.siteID}: dateOut: {v.dateOut}, must specify UTC offset in yaml timestamp, e.g., +00:00, -06:00, etc. ')
+                v.dateIn=v.dateIn.astimezone(ZoneInfo(self.timezone))
+                v.dateOut=v.dateOut.astimezone(ZoneInfo(self.timezone))
                 rng = pd.date_range(v.dateIn,v.dateOut,inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
             else:
+                v.dateIn=v.dateIn.astimezone(ZoneInfo(self.timezone))
                 rng = pd.date_range(v.dateIn,datetime.now(),inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
             dates.append(pd.DataFrame(index=rng,data={k:[k for i in range(rng.shape[0])]}))
-        breakpoint()
         self.sensorHistory = pd.concat(dates,axis=1).fillna('')
         self.sensorHistory['sensorGroup'] = self.sensorHistory.agg('_'.join,axis=1).str.replace(r'(_)\1+', '_', regex=True).str.strip('_')
         self.sensorHistory = self.sensorHistory[['sensorGroup']]

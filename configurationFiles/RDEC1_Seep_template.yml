@@ -30,7 +30,7 @@ sensors:
     modelName: TC
     serialNumber: 3
     dateIn: *V1_dateIn
-    dateOut: 2026-08-05T00:00:00
+    dateOut: 2026-08-05T00:00:00-07:00
     sensorType: biomet
     xSeparation: 0.5
     ySeparation: 0.1

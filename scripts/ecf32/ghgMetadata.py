@@ -21,19 +21,19 @@ class ghgMetadata(baseDataClass):
     def __post_init__(self):
         for section in eddyproMetadataTemplate.sections():
             self.__setattr__(section,dict(eddyproMetadataTemplate[section]))
-        self.Project['creation_date'] = datetime.strftime(datetime.now(),format='%Y-%m-%dT%H:%M:%S')
+        self.Project['creation_date'] = datetime.now().isoformat()#datetime.strftime(datetime.now(),format='%Y-%m-%dT%H:%M:%S%z')
         self.Project['lastChangeDate'] = self.Project['creation_date']
 
     def siteData(self,siteConfig,sensorList,start_date=None,stop_date=None,retrunDict=True):
         if start_date is None:
-            self.Project['start_date'] = datetime.strftime(siteConfig.startDate,format='%Y-%m-%dT%H:%M:%S')
+            self.Project['start_date'] = siteConfig.startDate.isoformat()#datetime.strftime(siteConfig.startDate,format='%Y-%m-%dT%H:%M:%S%z')
         else:
-            self.Project['start_date'] = datetime.strftime(start_date,format='%Y-%m-%dT%H:%M:%S')
+            self.Project['start_date'] = start_date.isoformat()#datetime.strftime(start_date,format='%Y-%m-%dT%H:%M:%S%z')
         if stop_date is None:
             if siteConfig.stopDate:
-                self.Project['end_date'] = datetime.strftime(siteConfig.stopDate,format='%Y-%m-%dT%H:%M:%S')
+                self.Project['end_date'] = siteConfig.stopDate.isoformat()#datetime.strftime(siteConfig.stopDate,format='%Y-%m-%dT%H:%M:%S%z')
         else:
-            self.Project['end_date'] = datetime.strftime(stop_date,format='%Y-%m-%dT%H:%M:%S')
+            self.Project['end_date'] = stop_date.isoformat()#datetime.strftime(stop_date,format='%Y-%m-%dT%H:%M:%S%z')
         self.Site['site_id'] = siteConfig.siteID
         if siteConfig.siteName:
             self.Site['site_name'] = siteConfig.siteName

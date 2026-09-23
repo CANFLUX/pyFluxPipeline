@@ -62,14 +62,6 @@ class database(project):
         return(pd.Series({ts:i+1970 for i,ts in enumerate(timestamp)},name='Year'))
 
 
-    # def loadSiteConfiguration(self,siteID):
-    #     return(
-    #         siteConfiguration.from_yaml(
-    #             os.path.join(self.projectPath,'Sites',siteID,"siteMetadata.yml"),
-    #             kwargs={'projectPath':self.projectPath}
-    #             )
-    #         )
-
     def writeTrace(self,trace,filePath):
         dtype = str(trace.dtype)
         filePath = f"{filePath}.{dtype}"

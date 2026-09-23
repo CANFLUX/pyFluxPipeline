@@ -1,7 +1,7 @@
 siteID: SCL
 siteName: Swiss Cheese Lake
 lat_lon: [69.2264167, -135.2519067]
-startDate: &V1_dateIn 2024-07-10T00:00:00
+startDate: &V1_dateIn 2024-07-10T00:00:00+00:00
 dataLoggers:
   main:
     dateIn: *V1_dateIn
@@ -25,7 +25,7 @@ sensors:
     modelName: CSAT3
     serialNumber: 1
     dateIn: *V1_dateIn
-    dateOut: &V1_dateOut 2024-09-15T00:00:00
+    dateOut: &V1_dateOut 2024-09-15T00:00:00+07:00
     sensorType: sonic
     Zm: &V1_Zm 3.285
     northOffset: &V1_northOffset 33.0
@@ -52,7 +52,7 @@ sensors:
   IRGASON:
     modelName: IRGASON
     serialNumber: 1
-    dateIn: &V2_dateIn 2025-08-01T00:00:00
+    dateIn: &V2_dateIn 2025-08-01T00:00:00+07:00
     sensorType: sonic-irga
     Zm: *V1_Zm
     northOffset: *V1_northOffset

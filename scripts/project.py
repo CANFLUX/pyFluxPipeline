@@ -7,13 +7,13 @@ from scripts.siteConfiguration.siteConfiguration import siteConfiguration
 
 @dataclass(kw_only=True)
 class project(defaultSettings):
-    useParallel: bool = field(default=True,repr=False)
 
     def __post_init__(self):
         self.metaPath = os.path.join(self.projectPath,'Sites')
         return super().__post_init__()
 
     def loadSiteConfiguration(self,siteID):
+        print(os.path.join(self.metaPath,siteID,"siteMetadata.yml"))
         siteConfig = siteConfiguration.from_yaml(
                             os.path.join(self.metaPath,siteID,"siteMetadata.yml"),
                             kwargs={'projectPath':self.projectPath}

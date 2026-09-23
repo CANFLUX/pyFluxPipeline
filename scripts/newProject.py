@@ -3,23 +3,26 @@ from scripts.database.database import database
 from dataclasses import dataclass, field
 from helperFunctions.baseClass import mdMap
 from scripts.siteConfiguration.siteConfiguration import siteConfiguration
+import shutil
 import os
+
+
 
 @dataclass(kw_only=True)
 class createProject(database):
+    reset: bool = field(default=False,repr=False)
     projectPath: str = field(repr=True)
-    # projectPath: str = field(metadata=mdMap('Root path of the current project'))
     sitesList: list = field(default_factory=lambda:['.templateSite'],metadata=mdMap('List of siteIDs'))
-    # siteConfigTemplates: dict = field(default_factory=dict,repr=False)
     
     def __post_init__(self):
+        if self.reset:
+            if os.path.exists(self.projectPath):
+                shutil.rmtree(self.projectPath)
         super().__post_init__()
         if not os.path.isdir(self.projectPath) or len(os.listdir(self.projectPath))==0:
             self.newProject()
         elif not any([os.path.exists(os.path.join(self.projectPath,v)) for v in ['Database','Sites','projectConfig.yml']]):
             self.logError(f'Non-empty non-project directory: {self.projectPath}')
-
-        # self.readSiteInventory()
 
     def newProject(self):
         os.makedirs(os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini'))
@@ -37,17 +40,17 @@ class createProject(database):
     def newSite(self,siteID):
         if isinstance(siteID,str):
             if os.path.isfile(siteID):
-                temp = siteConfiguration.from_yaml(siteID,kwargs={'projectPath':self.projectPath,'readOnly':False})
+                temp = siteConfiguration.from_yaml(siteID,kwargs={'projectPath':self.projectPath})
                 siteID = temp.siteID
             elif siteID.isalnum():
-                temp = siteConfiguration(siteID=siteID,projectPath=self.projectPath,template=True,startDate=f"{self.currentYear}-01-01 00:00:00+00:00",readOnly=False)
+                temp = siteConfiguration(siteID=siteID,projectPath=self.projectPath,template=True,startDate=f"{self.currentYear}-01-01 00:00:00+00:00")
                 siteID = temp.siteID
             else:
                 self.logError(f"Invalid siteID: {siteID}")
         # Load user provided template dict
         elif isinstance(siteID,dict):
             siteID['projectPath'] = self.projectPath
-            temp = siteConfiguration(**siteID,readOnly=False)
+            temp = siteConfiguration(**siteID)
             siteID = temp.siteID
         else:
         # Load default template

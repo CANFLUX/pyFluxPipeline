@@ -122,7 +122,7 @@ class discoverFiles(sharedFields):
         test = ['tableName','loggerModel','program','fileFormat','dataIntervalSeconds','traces','timezone']
         duplicates = files[test].duplicated().values
         # Name reference and configuration yaml
-        files['fileTimestamp'] = files['fileTimestamp'].dt.strftime('%Y-%m-%dT%H:%M:%S%z')
+        files['fileTimestamp'] = files['fileTimestamp'].dt.isoformat()#strftime('%Y-%m-%dT%H:%M:%S%z')
         # Mask duplicates and ffill
         files.loc[duplicates,['referenceFile','sourceID']] = np.nan
         files[['referenceFile','sourceID']] = files[['referenceFile','sourceID']].ffill()

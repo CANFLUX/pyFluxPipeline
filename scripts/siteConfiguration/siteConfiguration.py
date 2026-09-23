@@ -55,21 +55,23 @@ class siteConfiguration(defaultSettings):
     dataLoggers: dict = field(default_factory=dict)
     sensors: dict = field(default_factory=dict)
     dataSources: dict = field(default_factory=dict)
-    template: bool = field(default=False,repr=False)
-    readOnly: bool = field(default=True,repr=False)
+    fromYAML: bool = field(default=True,repr=False)
 
     def __post_init__(self):
-        breakpoint()
-        if not self.readOnly:
-            self.validateConfiguration()
-        else:
-            self.sensorGroups = pd.read_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorGroups.csv"),header=[0,1],index_col=[0])
-            self.sensorHistory = pd.read_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorHistory.csv"),index_col=[0])
-            self.sensorHistory.index = pd.to_datetime(self.sensorHistory.index)
         super().__post_init__()
-        self.loadIni()
+        self.metaPath = os.path.join(self.projectPath,'Sites')
+        self.fileName = os.path.join(self.metaPath,self.siteID,"siteMetadata.yml")
+        self.iniPath = os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini',f"{self.siteID}_config.yml")
+        if not os.path.isfile(self.fileName):
+            self.validateConfiguration(writeNew=True)
+            self.loadIni(writeNew=True)
+        else:
+            self.sensorGroups = pd.read_csv(os.path.join(self.metaPath,self.siteID,"sensorGroups.csv"),header=[0,1],index_col=[0])
+            self.sensorHistory = pd.read_csv(os.path.join(self.metaPath,self.siteID,"sensorHistory.csv"),index_col=[0])
+            self.sensorHistory.index = pd.to_datetime(self.sensorHistory.index)
+            self.loadIni()
 
-    def validateConfiguration(self):
+    def validateConfiguration(self,writeNew):
         # dataloggers first
         IDs = list(self.dataLoggers.keys())
         for id in IDs:
@@ -82,9 +84,7 @@ class siteConfiguration(defaultSettings):
             params = self.sensors.pop(id)
             params = sensor.from_dict(params)
             self.sensors[params.hardwareID] = params
-            print(os.path.join(self.projectPath,'Sites',self.siteID,"siteMetadata.yml"))
-            breakpoint()
-            self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,"siteMetadata.yml"))
+            # breakpoint()
         dates = []
         for k,v in self.sensors.items():
             if v.dateIn.tzinfo is None:
@@ -92,17 +92,27 @@ class siteConfiguration(defaultSettings):
             if v.dateOut is not None:
                 if v.dateOut.tzinfo is None:
                     self.logError(f'Error in {self.siteID}: dateOut: {v.dateOut}, must specify UTC offset in yaml timestamp, e.g., +00:00, -06:00, etc. ')
-                v.dateIn=v.dateIn.astimezone(ZoneInfo(self.timezone))
-                v.dateOut=v.dateOut.astimezone(ZoneInfo(self.timezone))
-                rng = pd.date_range(v.dateIn,v.dateOut,inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
+                rng = pd.date_range(
+                    v.dateIn.astimezone(ZoneInfo(self.timezone)).isoformat(),
+                    v.dateOut.astimezone(ZoneInfo(self.timezone)).isoformat(),
+                    inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
             else:
-                v.dateIn=v.dateIn.astimezone(ZoneInfo(self.timezone))
-                rng = pd.date_range(v.dateIn,datetime.now(),inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
+                rng = pd.date_range(
+                    v.dateIn.astimezone(ZoneInfo(self.timezone)).isoformat(),
+                    datetime.now().astimezone(ZoneInfo(self.timezone)).isoformat(),inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
             dates.append(pd.DataFrame(index=rng,data={k:[k for i in range(rng.shape[0])]}))
+        self.sensorGroups(dates)
+        if writeNew:
+            self.logMessage(f'saving files for {self.siteID}')
+            self.saveConfigFile(self.fileName)
+            self.sensorGroups.to_csv(os.path.join(self.metaPath,self.siteID,"sensorGroups.csv"))
+            self.sensorHistory.to_csv(os.path.join(self.metaPath,self.siteID,"sensorHistory.csv"))
+
+    def sensorGroups(self,dates):
+        # Group system sensors
         self.sensorHistory = pd.concat(dates,axis=1).fillna('')
         self.sensorHistory['sensorGroup'] = self.sensorHistory.agg('_'.join,axis=1).str.replace(r'(_)\1+', '_', regex=True).str.strip('_')
         self.sensorHistory = self.sensorHistory[['sensorGroup']]
-        self.sensorHistory.to_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorHistory.csv"))
         tmp = self.sensorHistory.reset_index().groupby(['sensorGroup']).count()
         groupMeta = ghgMetadata()
         self.sensorGroups = pd.concat([
@@ -120,12 +130,10 @@ class siteConfiguration(defaultSettings):
             )
             for sensorGroup in tmp.index
         ])
-        self.sensorGroups.to_csv(os.path.join(self.projectPath,'Sites',self.siteID,"sensorGroups.csv"))
           
     
-    def loadIni(self):
-        self.iniPath = os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini',f"{self.siteID}_config.yml")
-        if os.path.isfile(self.iniPath):
+    def loadIni(self,writeNew=False):
+        if os.path.isfile(self.iniPath) and not writeNew:
             self.ini = self.loadDict(self.iniPath)
         else:
             self.ini = configTemplate(Metadata={
@@ -133,13 +141,13 @@ class siteConfiguration(defaultSettings):
                 'lat':self.lat_lon[0],
                 'long':self.lat_lon[1],
                 }).__dict__
-        if not self.readOnly:
             self.saveDict(self.ini,self.iniPath)
 
-    def updateIni(self,sourceID=None,sourceFile=None):#,overwrite=False):
-        if sourceFile is None:
-            if sourceID is None:
-                sourceFile = self.loadDict(os.path.join(self.metaPath,self.siteID,sourceID)+'.yml') 
+    def updateIni(self,sourceID=None,sourceFile=None):
+        overwrite = False
+        if sourceFile is None and sourceID is not None:
+            sourceFile = self.loadDict(os.path.join(self.metaPath,self.siteID,'Database',sourceID)+'.yml') 
+            overwrite = True
         elif sourceFile is None:
             self.logError('Must provide sourceID')
         rawDatabase = self.ini['rawData']['Database']
@@ -168,9 +176,8 @@ class siteConfiguration(defaultSettings):
                 first[value['variableName']] = inputTrace
             elif inputFile not in first[value['variableName']]['inputFiles']:
                 first[value['variableName']]['inputFiles'][inputFile] = inputDates
-            elif sourceFile['sourceID'] == sourceID:
+            elif overwrite:
                 first[value['variableName']] = inputTrace
             else:
                 self.logError(f"Unexpected duplicate in {first[value['variableName']]['inputFiles']}")
         self.saveDict(self.ini,self.iniPath)
-

@@ -5,6 +5,7 @@ stopDate: &V1_dateOut 2026-08-05T00:00:00+00:00
 dataLoggers:
   main:
     dateIn: *V1_dateIn
+    dateOut: *V1_dateOut
     modelName: CR1000x
     serialNumber: 1
 sensors:

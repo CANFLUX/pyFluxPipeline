@@ -2,7 +2,7 @@
 # from scripts.rawFileProcessing.rawFile import rawFile
 from scripts.traceAnalysis.firstStage import firstStage
 # from scripts.rawFileProcessing.parseCSI import discoverCSI
-from scripts.rawFileProcessing.rawFile import discoverFiles
+from scripts.rawFileProcessing.rawFile_2 import discoverFiles
 from scripts.newProject import createProject
 from scripts.siteConfiguration import siteConfiguration
 import shutil

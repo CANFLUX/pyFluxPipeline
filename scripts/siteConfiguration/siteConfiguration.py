@@ -3,11 +3,14 @@ from helperFunctions.baseClass import spatialObject,mdMap
 from ruamel.yaml.scalarstring import LiteralScalarString
 from scripts.ecf32.ghgMetadata import ghgMetadata
 from scripts.defaultSettings import defaultSettings
+from scripts.traceAnalysis.traceParameters import firstStageTrace
+from ruamel.yaml.comments import CommentedSeq
 from dataclasses import dataclass, field
 from datetime import datetime
 import pandas as pd
 import numpy as np
 from zoneinfo import ZoneInfo
+import json
 import os
 
 @dataclass(kw_only=True)
@@ -42,7 +45,7 @@ class configTemplate:
 class siteConfiguration(defaultSettings):
     siteID: str = field(metadata = mdMap('Unique siteID code'))
     siteName: str = field(default = None,metadata = mdMap('Long-format name'))
-    startDate: datetime = field(metadata = mdMap('Start Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
+    startDate: datetime = field(default = None, metadata = mdMap('Start Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
     stopDate: datetime = field(default = None,metadata = mdMap('Stop Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
     sitePI: str = field(default = None,metadata=mdMap('Principal Investigator(s)'))
     lat_lon: spatialObject = field(default_factory=lambda:[None,None],metadata = mdMap('List of [Latitude, Longitude] coordinates in WGS1984 stored in decimal degrees.  Will parse coordinates if provided as strings in DMS or DDM format. For nested values, assumed to be same as parent object.  Optionally to provide if different from parent value.'))
@@ -56,6 +59,7 @@ class siteConfiguration(defaultSettings):
     readOnly: bool = field(default=True,repr=False)
 
     def __post_init__(self):
+        breakpoint()
         if not self.readOnly:
             self.validateConfiguration()
         else:
@@ -78,6 +82,8 @@ class siteConfiguration(defaultSettings):
             params = self.sensors.pop(id)
             params = sensor.from_dict(params)
             self.sensors[params.hardwareID] = params
+            print(os.path.join(self.projectPath,'Sites',self.siteID,"siteMetadata.yml"))
+            breakpoint()
             self.saveConfigFile(os.path.join(self.projectPath,'Sites',self.siteID,"siteMetadata.yml"))
         dates = []
         for k,v in self.sensors.items():
@@ -129,3 +135,42 @@ class siteConfiguration(defaultSettings):
                 }).__dict__
         if not self.readOnly:
             self.saveDict(self.ini,self.iniPath)
+
+    def updateIni(self,sourceID=None,sourceFile=None):#,overwrite=False):
+        if sourceFile is None:
+            if sourceID is None:
+                sourceFile = self.loadDict(os.path.join(self.metaPath,self.siteID,sourceID)+'.yml') 
+        elif sourceFile is None:
+            self.logError('Must provide sourceID')
+        rawDatabase = self.ini['rawData']['Database']
+        first = self.ini['Processing']['FirstStage']
+        inputDates = CommentedSeq([sourceFile['startDate'],sourceFile['stopDate']])
+        inputDates.yaml_set_anchor(f'{sourceFile["sourceID"]}.inputDates')
+        rawDatabase[sourceFile['sourceID']] = inputDates
+        if self.posixName not in first:
+            first[self.posixName] = firstStageTrace(
+                variableName=self.posixName,
+                inputFiles=f"{sourceFile['sourceID']}.{self.posixName}",
+                inputDates=inputDates,
+                dtype='int64',
+                units='s',
+                notes='default time-trace (seconds since unix epoch)').to_dict()
+        else:
+            first[self.posixName]['inputFiles'][f"{sourceFile['sourceID']}.{self.posixName}"] = inputDates
+        if type(sourceFile['traces']) is str:
+            sourceFile['traces'] = json.loads(sourceFile['traces'])
+        for value in sourceFile['traces'].values():
+            if value['ignore']:
+                continue
+            inputFile = f"{sourceFile['sourceID']}.{value['variableName']}"
+            inputTrace = firstStageTrace.from_dict(value|{'inputFiles':inputFile,'inputDates':inputDates}).to_dict()
+            if value['variableName'] not in first:
+                first[value['variableName']] = inputTrace
+            elif inputFile not in first[value['variableName']]['inputFiles']:
+                first[value['variableName']]['inputFiles'][inputFile] = inputDates
+            elif sourceFile['sourceID'] == sourceID:
+                first[value['variableName']] = inputTrace
+            else:
+                self.logError(f"Unexpected duplicate in {first[value['variableName']]['inputFiles']}")
+        self.saveDict(self.ini,self.iniPath)
+

@@ -1,6 +1,6 @@
 
 from scripts.rawFileProcessing.fileInventory import fileInventory
-from scripts.rawFileProcessing.rawFile import rawFile
+from scripts.rawFileProcessing.rawFile_2 import rawFile
 from scripts.traceAnalysis.firstStage import firstStage
 from scripts.newProject import createProject
 import shutil

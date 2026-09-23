@@ -32,7 +32,7 @@ class discoverFiles(sharedFields):
     def __post_init__(self):
         super().__post_init__()
         # Read configuration and inventories
-        self.siteConfig,self.sensorGroups,self.sensorHistory = self.loadSiteConfiguration(self.siteID,sensorGropus=True)
+        self.siteConfig,self.sensorGroups,self.sensorHistory = self.loadSiteConfiguration(self.siteID,sensorGroups=True)
         self.metaPath = os.path.join(self.projectPath,'Sites',self.siteID)
         self.fileInventoryPath = os.path.join(self.metaPath,'.inventory','fileInventory.json')
         self.fileInventory = self.loadDict(self.fileInventoryPath,template={})

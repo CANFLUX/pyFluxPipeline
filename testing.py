@@ -2,10 +2,10 @@
 # from scripts.rawFileProcessing.rawFile import rawFile
 from scripts.traceAnalysis.firstStage import firstStage
 # from scripts.rawFileProcessing.parseCSI import discoverCSI
-from scripts.rawFileProcessing.fileSearch import fileSearch
+from scripts.rawFileProcessing.fileTools import fileSearch,fileSet
 # from scripts.rawFileProcessing.rawFile import discoverFiles
 from scripts.newProject import createProject
-from scripts.siteConfiguration import siteConfiguration
+from scripts.siteConfiguration.siteConfiguration import siteConfiguration
 import shutil
 import os
 from scripts.ecf32.ecf32 import ecf32
@@ -26,10 +26,11 @@ if __name__ == '__main__':
     if reset:
         if os.path.exists(projectPath):
             shutil.rmtree(projectPath)
+    # breakpoint()
     if not os.path.isdir(projectPath):
         createProject(projectPath=projectPath,sitesList=[
-#             'configurationFiles/SCL_template.yml', # Template from preexisting metadata file for SCL
-            'configurationFiles/RDEC1_Seep_template.yml', # Template from preexisting metadata file for RDEC1
+            'configurationFiles/SCL_template.yml', # Template from preexisting metadata file for SCL
+            # 'configurationFiles/RDEC1_Seep_template.yml', # Template from preexisting metadata file for RDEC1
 #             # {'siteID': 'BSP','lat_lon': [69.319431, -135.478286],'startDate':'2026-06-01'}, # Template from dict for BSP
 #             # 'FIL', # Generic template for site FIL and ILL
 #             # 'ILL'
@@ -42,30 +43,32 @@ if __name__ == '__main__':
         'ignoreTraces':['Bowen_ratio','daytime','d','sampleTime','Drop_rate_*','CH4_mole_fraction','nanoseconds_*','seconds_*','milliseconds_*','buff_depth_Max','T_CDM_VOLT*','FETCH_*','separation_*','FreqFactor_*','process_time*','slowsequence_Tot','air_mass*','*_Cov','*_f_Tot','fetch_wd_*','_WPL_*','rho_*_*','alpha','beta','FC_*','ET','ET_*','FCH4_*','sun_*','height_*','hour_*','iteration_*'],
         'renameTraces':{'SW_IN':'SW_IN_1_1_1','LW_IN':'LW_IN_1_1_1','SW_OUT':'SW_OUT_1_1_1','LW_OUT':'LW_OUT_1_1_1'},
     }
-    # with open('configurationFiles/CSFormat.yml','w+') as f:
-    #     f.write(yaml.safe_dump(CSFormat))
+    with open('configurationFiles/CSFormat.yml','w+') as f:
+        f.write(yaml.safe_dump(CSFormat))
 
     with open('configurationFiles/CSFormat.yml') as f:
         CSFormat = yaml.safe_load(f)
 
-
-#     # Get met files loaded first
-#     Time_Series = {
-#         'fileFormat':'TOB3',
-#         'findFiles':['*Time_Series*'],
-#         'ignoreTraces':['milliseconds_LI7700']#,'daytime','d','sampleTime','Drop_rate_*','CH4_mole_fraction','nanoseconds_*','seconds_*','milliseconds_*','buff_depth_Max','T_CDM_VOLT*','FETCH_*','separation_*','FreqFactor_*','process_time*','slowsequence_Tot','air_mass*','*_Cov','*_f_Tot','fetch_wd_*','_WPL_*','rho_*_*','alpha','beta','FC_*','ET','ET_*','FCH4_*','sun_*','height_*','hour_*','iteration_*'],
-#         # 'renameTraces':{'SW_IN':'SW_IN_1_1_1','LW_IN':'LW_IN_1_1_1','SW_OUT':'SW_OUT_1_1_1','LW_OUT':'LW_OUT_1_1_1'},
-#     }
-#     with open('configurationFiles/Time_Series.yml','w+') as f:
-#         f.write(yaml.safe_dump(Time_Series))
+    # Get met files loaded first
+    Time_Series = {
+        'fileFormat':'TOB3',
+        'findFiles':['*Time_Series*'],
+        'ignoreTraces':['milliseconds_LI7700']#,'daytime','d','sampleTime','Drop_rate_*','CH4_mole_fraction','nanoseconds_*','seconds_*','milliseconds_*','buff_depth_Max','T_CDM_VOLT*','FETCH_*','separation_*','FreqFactor_*','process_time*','slowsequence_Tot','air_mass*','*_Cov','*_f_Tot','fetch_wd_*','_WPL_*','rho_*_*','alpha','beta','FC_*','ET','ET_*','FCH4_*','sun_*','height_*','hour_*','iteration_*'],
+        # 'renameTraces':{'SW_IN':'SW_IN_1_1_1','LW_IN':'LW_IN_1_1_1','SW_OUT':'SW_OUT_1_1_1','LW_OUT':'LW_OUT_1_1_1'},
+    }
+    with open('configurationFiles/Time_Series.yml','w+') as f:
+        f.write(yaml.safe_dump(Time_Series))
     fileSearch(
         projectPath=projectPath,
         siteID='SEEP',
         # fileFormat='TOB3',
         searchPath=data_dump+'/RDEC1/2026/20260614',        
+        # **Time_Series
         **CSFormat
     )
+    print('Check ini then proceed')
     breakpoint()
+    siteConfiguration(projectPath=projectPath,siteID='SEEP').updateIni('TOB3_Flux_CSFormat_202606111732')
     fileSearch(
         projectPath=projectPath,
         siteID='SEEP',

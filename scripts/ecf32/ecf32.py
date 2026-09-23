@@ -25,7 +25,7 @@ class ecf32(project):
         self.basePath = os.path.join(self.projectPath,'ecf32',self.siteID,self.sourceID)
         self.ecf32HeaderFile = os.path.join(self.basePath,'ecf32Variables.yml')
         #,sourceID,traces,dataInterval):
-        siteConfig,sensorGroups,sensorHistory = self.loadSiteConfiguration(self.siteID,sensorGropus=True)
+        siteConfig,sensorGroups,sensorHistory = self.loadSiteConfiguration(self.siteID,sensorGroups=True)
         if kwargs['stopDate'] is None:
             kwargs['stopDate'] = sensorHistory.index[-1]
         

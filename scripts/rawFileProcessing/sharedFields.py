@@ -71,11 +71,11 @@ class sharedFields(project):
         metadata=mdMap('extract data or inspect header',options=['extractData','identifyTraces']))
 
     def __post_init__(self):
-        self.fileSuffix = supportedFormats[self.fileFormat]
         if self.fileFormat is None:
-            self.fileFormat = type(self).__name__
-            self.logMessage(f'Setting fileFormat: {self.fileFormat}')
-        if self.fileExtension is None:
+            self.logMessage('NoFileFormat?')
+            # self.fileFormat = type(self).__name__
+            # self.logMessage(f'Setting fileFormat: {self.fileFormat}')
+        if self.fileExtension is None and self.fileFormat is not None:
             self.fileExtension = supportedFormats[self.fileFormat]
         super().__post_init__()
 

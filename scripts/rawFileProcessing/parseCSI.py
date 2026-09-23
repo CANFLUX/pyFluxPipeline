@@ -100,6 +100,7 @@ class TOB3(csiTable):
                     if len([t for t in tIn if t not in tEx]):
                         self.logError(f"Unexpected traces in {self.fileName}:\n{[t for t in tIn if t not in tEx]} are not defined in configuration file")
                 self.tracesIn = list(tracesIn.keys())
+            self.startDate = self.fileTimestamp
             if self.mode == 'extractData':
                 self.frameParameters()
                 # Read full file

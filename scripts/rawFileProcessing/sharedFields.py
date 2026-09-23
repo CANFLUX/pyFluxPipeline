@@ -1,4 +1,5 @@
-from scripts.database.database import database
+# from scripts.database.database import database
+from scripts.project import project
 from scripts.ecf32.ecf32 import ecf32
 # from helperFunctions.baseClass import baseDataClass, mdMap
 # from scripts.defaultSettings import defaultSettings
@@ -6,13 +7,14 @@ from scripts.ecf32.ecf32 import ecf32
 from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass,field
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import pandas as pd
 import fnmatch
 import random
 import string
 import os
 
-formats = {
+supportedFormats = {
     'HOBOcsv':'csv',
     'EddyProOutput':'csv',
     'GHG':'ghg',
@@ -33,7 +35,7 @@ formats = {
 
 
 @dataclass(kw_only=True)
-class sharedFields(database,ecf32):
+class sharedFields(project):
     fileName: str = field(repr=False)
     fileExtension: str = field(default=None,repr=False)
     na_values: str = field(default=None,repr=False)
@@ -46,18 +48,17 @@ class sharedFields(database,ecf32):
     sourceID: str = field(default=None)
     siteID: str = field(default=None)
 
-    tableName: str = field(default=None,init=False)#,repr=False)
-    tableSize: str = field(default=None,init=False)#,repr=False)
+    tableName: str = field(default=None,init=False)
+    tableSize: str = field(default=None,init=False)
     fileTimestamp: datetime = field(default=None,init=False)
-    stationName: str = field(default=None,init=False)#,repr=False)
-    loggerModel: str = field(default=None,init=False)#,repr=False)
-    serialNumber: str = field(default=None,init=False)#,repr=False)
-    program: str = field(default=None,init=False)#,repr=False)
+    stationName: str = field(default=None,init=False)
+    loggerModel: str = field(default=None,init=False)
+    serialNumber: str = field(default=None,init=False)
+    program: str = field(default=None,init=False)
     
-    fileFormat: str = field(default = None,metadata=mdMap('used to determine which file parser', options=list(formats.keys())))
-    # outputFormat: str = field(default='Database',metadata=mdMap('used to determine which file parser', options=['Database','highfrequency']))
+    fileFormat: str = field(default = None,metadata=mdMap('used to determine which file parser', options=list(supportedFormats.keys())))
     dataIntervalSeconds: float = field(default = None,metadata=mdMap('Autoparsed from file'))
-    timestampFormat: str = field(default = None,metadata=mdMap('provide if cannot be parsed automatically', options=list(formats.keys())))
+    timestampFormat: str = field(default = None,metadata=mdMap('provide if cannot be parsed automatically', options=list(supportedFormats.keys())))
     traces: dict = field(default_factory=dict,metadata=mdMap('Autoparsed from file or user provieded'))
 
     startDate: datetime = field(default=None)
@@ -70,14 +71,18 @@ class sharedFields(database,ecf32):
         metadata=mdMap('extract data or inspect header',options=['extractData','identifyTraces']))
 
     def __post_init__(self):
+        self.fileSuffix = supportedFormats[self.fileFormat]
         if self.fileFormat is None:
             self.fileFormat = type(self).__name__
             self.logMessage(f'Setting fileFormat: {self.fileFormat}')
         if self.fileExtension is None:
-            self.fileExtension = formats[self.fileFormat]
+            self.fileExtension = supportedFormats[self.fileFormat]
         super().__post_init__()
 
-    def formatTraces(self):
+    def formatMetadata(self):
+        self.startDate = self.startDate.replace(tzinfo=ZoneInfo(self.timezone))
+        if self.stopDate is not None:
+            self.stopDate = self.stopDate.replace(tzinfo=ZoneInfo(self.timezone))
         if self.dataIntervalSeconds > 60:
             self.saveAs = 'Database'
         elif self.dataIntervalSeconds > 0 and self.dataIntervalSeconds<60:

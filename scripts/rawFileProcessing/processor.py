@@ -13,10 +13,11 @@ def check(fileFormat):
         sys.exit(f'File format not supported: {fileFormat}')
 
 def getRawFileMetadata(
-    projectPath: str,
     fileName: str,
+    projectPath: str,
     fileFormat: str,
     siteID: str,
+    timezone: str,
     ignoreTraces: list = [],
     renameTraces: dict = {}
     ):
@@ -30,7 +31,7 @@ def getRawFileMetadata(
         renameTraces=renameTraces
         )
     
-    out.formatTraces()
+    out.formatMetadata()
     out.traces = json.dumps(out.traces)
     return(out.to_dict())
         

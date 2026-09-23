@@ -13,17 +13,17 @@ class createProject(database):
     # siteConfigTemplates: dict = field(default_factory=dict,repr=False)
     
     def __post_init__(self):
+        super().__post_init__()
         if not os.path.isdir(self.projectPath) or len(os.listdir(self.projectPath))==0:
             self.newProject()
         elif not any([os.path.exists(os.path.join(self.projectPath,v)) for v in ['Database','Sites','projectConfig.yml']]):
             self.logError(f'Non-empty non-project directory: {self.projectPath}')
 
-        super().__post_init__()
         # self.readSiteInventory()
 
     def newProject(self):
         os.makedirs(os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini'))
-        os.makedirs(os.path.join(self.projectPath,'Sites'))
+        os.makedirs(self.metaPath)
         replaceMap = {}
         if isinstance(self.sitesList,str):
             self.sitesList = [self.sitesList]
@@ -53,6 +53,6 @@ class createProject(database):
         # Load default template
             self.saveDict(
                 temp.to_dict(),
-                os.path.join(self.projectPath,'Sites',siteID,"siteMetadata.yml")
+                os.path.join(self.metaPath,siteID,"siteMetadata.yml")
                 )
         return(siteID,temp)

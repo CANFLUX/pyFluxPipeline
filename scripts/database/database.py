@@ -21,7 +21,7 @@ class database(project):
         self.databasePath = os.path.join(self.projectPath,'Database')
         # self.highFrequencyPath = os.path.join(self.projectPath,'HighFrequencyData')
         if self.sitesList == []:
-            self.sitesList = [pth for pth in os.listdir(os.path.join(self.projectPath,'Sites'))]
+            self.sitesList = [pth for pth in os.listdir(self.metaPath)]
 
     def secondsToHertz(self,interval):
         if interval <= 0:

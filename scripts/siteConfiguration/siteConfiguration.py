@@ -103,7 +103,7 @@ class siteConfiguration(defaultSettings):
             pd.DataFrame(index=[sensorGroup],
                          data = {
                             (key,subKey):value for key,subSet in
-                            groupMeta.siteData(
+                            groupMeta.setSite(
                                 self,
                                 sensorGroup.split('_'),
                                 start_date=self.sensorHistory.loc[self.sensorHistory.sensorGroup==sensorGroup].index.min(),

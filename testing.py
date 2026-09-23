@@ -2,7 +2,8 @@
 # from scripts.rawFileProcessing.rawFile import rawFile
 from scripts.traceAnalysis.firstStage import firstStage
 # from scripts.rawFileProcessing.parseCSI import discoverCSI
-from scripts.rawFileProcessing.rawFile import discoverFiles
+from scripts.rawFileProcessing.fileSearch import fileSearch
+# from scripts.rawFileProcessing.rawFile import discoverFiles
 from scripts.newProject import createProject
 from scripts.siteConfiguration import siteConfiguration
 import shutil
@@ -35,12 +36,12 @@ if __name__ == '__main__':
             ])
         
 #     # Get met files loaded first
-#     CSFormat = {
-#         'fileFormat':'TOB3',
-#         'findFiles':['*Flux_CSFormat*'],
-#         'ignoreTraces':['Bowen_ratio','daytime','d','sampleTime','Drop_rate_*','CH4_mole_fraction','nanoseconds_*','seconds_*','milliseconds_*','buff_depth_Max','T_CDM_VOLT*','FETCH_*','separation_*','FreqFactor_*','process_time*','slowsequence_Tot','air_mass*','*_Cov','*_f_Tot','fetch_wd_*','_WPL_*','rho_*_*','alpha','beta','FC_*','ET','ET_*','FCH4_*','sun_*','height_*','hour_*','iteration_*'],
-#         'renameTraces':{'SW_IN':'SW_IN_1_1_1','LW_IN':'LW_IN_1_1_1','SW_OUT':'SW_OUT_1_1_1','LW_OUT':'LW_OUT_1_1_1'},
-#     }
+    CSFormat = {
+        'fileFormat':'TOB3',
+        'findFiles':['*Flux_CSFormat*'],
+        'ignoreTraces':['Bowen_ratio','daytime','d','sampleTime','Drop_rate_*','CH4_mole_fraction','nanoseconds_*','seconds_*','milliseconds_*','buff_depth_Max','T_CDM_VOLT*','FETCH_*','separation_*','FreqFactor_*','process_time*','slowsequence_Tot','air_mass*','*_Cov','*_f_Tot','fetch_wd_*','_WPL_*','rho_*_*','alpha','beta','FC_*','ET','ET_*','FCH4_*','sun_*','height_*','hour_*','iteration_*'],
+        'renameTraces':{'SW_IN':'SW_IN_1_1_1','LW_IN':'LW_IN_1_1_1','SW_OUT':'SW_OUT_1_1_1','LW_OUT':'LW_OUT_1_1_1'},
+    }
     # with open('configurationFiles/CSFormat.yml','w+') as f:
     #     f.write(yaml.safe_dump(CSFormat))
 
@@ -57,28 +58,45 @@ if __name__ == '__main__':
 #     }
 #     with open('configurationFiles/Time_Series.yml','w+') as f:
 #         f.write(yaml.safe_dump(Time_Series))
-
+    fileSearch(
+        projectPath=projectPath,
+        siteID='SEEP',
+        # fileFormat='TOB3',
+        searchPath=data_dump+'/RDEC1/2026/20260614',        
+        **CSFormat
+    )
+    breakpoint()
+    fileSearch(
+        projectPath=projectPath,
+        siteID='SEEP',
+        # fileFormat='TOB3',
+        sourceID='TOB3_Flux_CSFormat_202606111732',
+        searchPath=data_dump+'/RDEC1/2026',        
+        **CSFormat
+    )
     # SeepFlux = discoverFiles(
     #     projectPath=projectPath,
     #     siteID='SEEP',
     #     searchPath=data_dump+'/RDEC1/2026/20260614',        
-    #     processFiles=True,
+    #     # processFiles=True,
     #     useParallel=False,
     #     **CSFormat
     #     )
     
-#     # breakpoint()
-    with open('configurationFiles/Time_Series.yml') as f:
-        Time_Series = yaml.safe_load(f) 
-    SeepFlux = discoverFiles(
-        projectPath=projectPath,
-        siteID='SEEP',
-        searchPath=data_dump+'/RDEC1/2026/20260614',        
-        processFiles=False,
-        useParallel=False,
-        **Time_Series
-        # **{'fileFormat':'TOB3'}
-        )
-#     fs = firstStage(projectPath=projectPath,sites='SEEP',years=[2026])
+# #     # breakpoint()
+#     with open('configurationFiles/Time_Series.yml') as f:
+#         Time_Series = yaml.safe_load(f) 
+#     SeepFlux = discoverFiles(
+#         projectPath=projectPath,
+#         siteID='SEEP',
+#         searchPath=data_dump+'/RDEC1/2026/20260614',        
+#         processFiles=False,
+#         useParallel=False,
+#         timezone='American/Vancouver',
+#         **Time_Series,
+        
+#         # **{'fileFormat':'TOB3'}
+#         )
+# #     fs = firstStage(projectPath=projectPath,sites='SEEP',years=[2026])
 
 

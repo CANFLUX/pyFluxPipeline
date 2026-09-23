@@ -17,6 +17,7 @@ import json
 import time
 import os
 
+
 @dataclass(kw_only=True)
 class discoverFiles(sharedFields):
     siteID: str
@@ -31,13 +32,14 @@ class discoverFiles(sharedFields):
     def __post_init__(self):
         super().__post_init__()
         # Read configuration and inventories
-        self.siteConfig = self.loadSiteConfiguration(self.siteID)
+        self.siteConfig,self.sensorGroups,self.sensorHistory = self.loadSiteConfiguration(self.siteID,sensorGropus=True)
         self.metaPath = os.path.join(self.projectPath,'Sites',self.siteID)
         self.fileInventoryPath = os.path.join(self.metaPath,'.inventory','fileInventory.json')
         self.fileInventory = self.loadDict(self.fileInventoryPath,template={})
         self.fileSets = pd.DataFrame([self.loadDict(os.path.join(self.metaPath,k,f)+'.yml') for k,v in self.fileInventory.items() for f in v.keys()])
         if 'traces' in self.fileSets.columns:
             self.fileSets['traces'] = [json.dumps(tr) for tr in self.fileSets['traces']]
+        breakpoint()
 
         if self.searchPath is not None:
             self.updateInventory()
@@ -73,7 +75,8 @@ class discoverFiles(sharedFields):
             # traces = row.pop('traces')
             row['traces'] = json.loads(row['traces'])
             if row['saveAs'] == 'ecf32':
-                self.ecf32Metadata(kwargs=row)
+                breakpoint()
+                # self.ecf32Metadata(kwargs=row)
             self.saveDict(row,f"{os.path.join(self.metaPath,row['saveAs'],row['sourceID'])}.yml")
         self.saveDict(self.fileInventory,self.fileInventoryPath)
         
@@ -94,10 +97,12 @@ class discoverFiles(sharedFields):
 
         T1 = time.time()
         self.logMessage(f"Searching: {len(fileList)} files")
+        breakpoint()
         reader = partial(getRawFileMetadata,
                 projectPath=self.projectPath,
                 fileFormat=self.fileFormat,
                 siteID=self.siteID,
+                timezone=self.timezone,
                 ignoreTraces=self.ignoreTraces)
         if not self.useParallel:
             files = pd.DataFrame({f:reader(fileName=f) for f in fileList}).T
@@ -202,68 +207,3 @@ class discoverFiles(sharedFields):
         #     if len(processed)!=len(fileList['fileName']):
         #         breakpoint()
         #     self.fileInventory['Database'][sourceID]['processed']=processed
-
-#     def uploadDatabase(self):
-#         for fileConfigName,files in self.fileInventory['Database'].items():
-#             breakpoint()
-#             cfg = self.loadDict(os.path.join(self.metaPath,'Database',fileConfigName))
-#             for i, (file,processed) in enumerate(zip(files['fileName'],files['processed'])):
-#                 print(file,cfg['fileFormat'],cfg['dataIntervalSeconds'],cfg['saveAs'])
-#                 if cfg['saveAs'] == 'Database':
-#
-# 
-# 
-# 
-# 
-# 
-# 
-# dsfa
-# 
-# 
-# dddddfadfffffdddddddddkpoint()
-#                     tbx = processor[cfg['fileFormat']].from_dict(cfg|{'projectPath':self.projectPath,'fileName':file,'mode':'extractData'})
-#                     tbx.formatTable()
-#                     self.uploadRawData(tbx.dataTable,self.siteID,os.path.join('raw',cfg['sourceID']),cfg['dataIntervalSeconds'])
-#                     self.fileInventory['Database'][fileConfigName]['processed'][i]=True
-#                 elif cfg['saveAs'] == 'ecf32':
-#                     print('not writing ecf32')
-#                     pass
-#                     # self.ecf32Write(tbx.dataTable,cfg['traces'],cfg['dataIntervalSeconds'],self.siteID,cfg['tableName'])
-
-#     def uploadHighFrequency(self):
-#         for fileConfigName, files in self.fileInventory['highfrequency'].items():
-#             fileConfig = self.loadDict(os.path.join(self.metaPath,'highfrequency',fileConfigName))
-#             # ghgMetadata.
-#             # kwargs = fileConfig | {'siteID':self.siteID,'projectPath':self.projectPath,'mode':'ecf32'}
-#             breakpoint()
-
-#             # processor
-
-#             # ecf = ecf32(
-#             #     projectPath=self.projectPath,
-#             #     siteID=self.siteID,
-#             #     sourceID=fileConfig['sourceID'],
-#             #     kwargs=self.siteConfig.to_dict()|fileConfig
-#             #     )
-#             # self.fileInventory['highfrequency'][fileConfigName]['processed'][i]=True
-
-#         #     basePath,metadata=ecf32Setup(self.highFrequencyPath,self.siteID,fileConfig['sourceID'],fileConfig['traces'],fileConfig['dataIntervalSeconds'])
-#         #     # breakpoint()
-#         #     writer = partial(mpTOB3,config=fileConfig,basePath=basePath,metadata=metadata)
-#         #     with ProcessPoolExecutor(max_workers=4) as executor:
-#         #         out = {filename:True for filename, result in
-#         #                         zip(files['fileName'],
-#         #                             executor.map(writer, files['fileName']))}
-            
-#         #     breakpoint()
-        
-
-# # def mpTOB3(fileName,config,basePath,metadata):
-# #     if config['fileType']:
-# #         out = TOB3.from_dict(config|{'fileName':fileName})
-# #         out.formatTable()
-# #         ecf32Write(out.dataTable,metadata,basePath)
-#     # else:
-#     #     return None
-
-#     # return(out.dataTable)

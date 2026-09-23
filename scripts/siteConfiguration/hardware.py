@@ -39,6 +39,8 @@ class common(baseClass.baseDataClass):
         if self.serialNumber is None:
             self.logMessage(f"serial number missing, unique ID required, generating a random ID")
             self.serialNumber = randomID.randomID(5)
+        self.manufacturer = self.manufacturer.lower()
+        self.modelName = self.modelName.lower()
         self.hardwareID = f"{self.modelName}-{self.serialNumber}"
 
         super().__post_init__()

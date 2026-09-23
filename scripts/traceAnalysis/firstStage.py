@@ -46,7 +46,7 @@ class firstStage(database):
             else:
                 preEvaluate = None
             metadataIn = {
-                key: self.loadDict(os.path.join(self.projectPath,'Sites',siteID,'Database',f'{key}.yml'))
+                key: self.loadDict(os.path.join(self.metaPath,siteID,'Database',f'{key}.yml'))
                 for key in siteConfig.ini['rawData']['Database'].keys()
                 }
             #get all dtypes and cast to full, empty array

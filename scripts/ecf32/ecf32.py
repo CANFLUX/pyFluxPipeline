@@ -9,19 +9,10 @@ from scripts.ecf32.ghgMetadata import ghgMetadata
 from helperFunctions.baseClass import baseClassMethods
 
 
-biometHeader = baseClassMethods().loadDict(os.path.join(os.path.split(__file__)[0],'Biomet.yml'))
+# biometHeader = baseClassMethods().loadDict(os.path.join(os.path.split(__file__)[0],'Biomet.yml'))
 eddyproProjectTemplate = ConfigParser()
 eddyproProjectTemplate.read(os.path.join(os.path.split(__file__)[0],'template.eddypro'))
 
-def measurementType(units):
-    # Translate to eddypro specific expectation (gas samples only)
-    if 'm-3' in units or 'm^3' in units:
-        mType = 'density'
-    elif 'mol' in units:
-        mType = 'mixing ratio'
-    else:
-        mType = None
-    return(mType)
 
 @dataclass(kw_only=True)
 class ecf32(project):
@@ -35,18 +26,28 @@ class ecf32(project):
         self.ecf32HeaderFile = os.path.join(self.basePath,'ecf32Variables.yml')
         #,sourceID,traces,dataInterval):
         siteConfig,sensorGroups,sensorHistory = self.loadSiteConfiguration(self.siteID,sensorGropus=True)
-        self.metadata = ghgMetadata()
-        breakpoint()
-        self.metadata.siteData(siteConfig)
-        self.ecf32Header = {variable['variableName']:{
-            'units':variable['units'],
-            'sensorID':variable['sensorID'],
-            'measurementType':measurementType(variable['units']),
-            } for variable in kwargs['traces'].values() if not variable['ignore'] and variable['dtype'] == '<f4'}
+        if kwargs['stopDate'] is None:
+            kwargs['stopDate'] = sensorHistory.index[-1]
+        
+        # self.ecf32Header = {variable['variableName']:{
+        #     'units':variable['units'],
+        #     'sensorID':variable['sensorID'],
+        #     'measurementType':measurementType(variable['units']),
+        #     } for variable in kwargs['traces'].values() if not variable['ignore'] and variable['dtype'] == '<f4'}
+
+        # Iterate through groups, creaet metadata file for each sensor orientation that exits
+        for group in sensorHistory.loc[((sensorHistory.index>=kwargs['startDate'])&(sensorHistory.index<=kwargs['stopDate'])),'sensorGroup'].unique():
+            ghgMetadata_group = sensorGroups.loc[group]
+            ghgMetadata_group = {section:{key:value for key,value in ghgMetadata_group[section].to_dict().items()} for section in ghgMetadata_group.index.get_level_values(0).unique()}
+            test = ghgMetadata.from_dict(ghgMetadata_group)
+            test.setFileDescription(kwargs['traces'])
+
         if not os.path.isdir(self.basePath):
             os.makedirs(self.basePath)
         if not os.path.isfile(self.ecf32HeaderFile):
-            self.saveDict(self.ecf32Header,self.ecf32HeaderFile)
+            self.saveDict(test.to_dict(),self.ecf32HeaderFile)
+
+    # def 
 
     def getSegments(self,dataTable):
         segments = {}

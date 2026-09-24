@@ -84,7 +84,6 @@ class siteConfiguration(defaultSettings):
             params = self.sensors.pop(id)
             params = sensor.from_dict(params)
             self.sensors[params.hardwareID] = params
-            # breakpoint()
         dates = []
         for k,v in self.sensors.items():
             if v.dateIn.tzinfo is None:
@@ -143,6 +142,19 @@ class siteConfiguration(defaultSettings):
                 }).__dict__
             self.saveDict(self.ini,self.iniPath)
 
+    def updateRawSouces(self,dataFormat,sourceID,startDate,stopDate):
+        # Update the dates for raw files
+        if sourceID in self.ini['rawData'][dataFormat]:
+            inputDates = self.ini['rawData'][dataFormat][sourceID]
+            inputDates[0] = startDate
+            inputDates[1] = stopDate
+        else:
+            inputDates = CommentedSeq([startDate,stopDate])
+            inputDates.yaml_set_anchor(f'{sourceID}.inputDates')
+            self.ini['rawData'][dataFormat][sourceID] = inputDates
+        self.saveDict(self.ini,self.iniPath)
+        return(inputDates)
+
     def updateIni(self,sourceID=None,sourceFile=None):
         overwrite = False
         if sourceFile is None and sourceID is not None:
@@ -150,11 +162,8 @@ class siteConfiguration(defaultSettings):
             overwrite = True
         elif sourceFile is None:
             self.logError('Must provide sourceID')
-        rawDatabase = self.ini['rawData']['Database']
         first = self.ini['Processing']['FirstStage']
-        inputDates = CommentedSeq([sourceFile['startDate'],sourceFile['stopDate']])
-        inputDates.yaml_set_anchor(f'{sourceFile["sourceID"]}.inputDates')
-        rawDatabase[sourceFile['sourceID']] = inputDates
+        inputDates = self.updateRawSouces(sourceFile['dataFormat'],sourceFile['sourceID'],sourceFile['startDate'],sourceFile['stopDate'])
         if self.posixName not in first:
             first[self.posixName] = firstStageTrace(
                 variableName=self.posixName,

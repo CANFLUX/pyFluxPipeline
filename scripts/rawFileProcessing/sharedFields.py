@@ -63,7 +63,7 @@ class sharedFields(project):
 
     startDate: datetime = field(default=None)
     stopDate: datetime = field(default=None)
-    saveAs: str = field(default=None)
+    dataFormat: str = field(default=None)
     
     mode: str = field(
         default='identifyTraces',
@@ -84,9 +84,9 @@ class sharedFields(project):
         if self.stopDate is not None:
             self.stopDate = self.stopDate.replace(tzinfo=ZoneInfo(self.timezone))
         if self.dataIntervalSeconds > 60:
-            self.saveAs = 'Database'
+            self.dataFormat = 'Database'
         elif self.dataIntervalSeconds > 0 and self.dataIntervalSeconds<60:
-            self.saveAs = 'ecf32'
+            self.dataFormat = 'ecf32'
         self.fileTimestamp = self.fileTimestamp.tz_localize(self.timezone)
         if self.sourceID is None:
             self.sourceID = f"{self.fileFormat}_{self.tableName}_{self.fileTimestamp.strftime('%Y%m%d%H%M')}"
@@ -105,7 +105,7 @@ class sharedFields(project):
             if self.verbose:
                 self.logMessage(f"Total GPS induced offset in {self.fileName} is {Offset.iloc[-1]}s",verbose=False)
         if self.dataIntervalSeconds == 0 or self.dataIntervalSeconds is None:
-            self.saveAs = None
+            self.dataFormat = None
             self.logMessage(f"Not saving {self.fileName}")
             return None
 
@@ -126,7 +126,7 @@ class sharedFields(project):
 
         self.dataTable = self.dataTable.resample(f"{self.dataIntervalSeconds}s").nearest()
         
-        if self.saveAs == 'ecf32':
+        if self.dataFormat == 'ecf32':
             self.getSegments(self.dataTable)
             
                 
@@ -140,7 +140,7 @@ class sharedFields(project):
         # drop nan rows
         self.dataTable = self.dataTable.dropna(how='all')
         if self.dataTable.empty or self.dataIntervalSeconds == 0:
-            self.saveAs = None
+            self.dataFormat = None
             return None
         
         # elif self.dataIntervalSeconds is None:
@@ -149,7 +149,7 @@ class sharedFields(project):
         if self.dataTable.index.duplicated().sum():
             self.logWarning(f"Duplicated indices at in position:\n{self.dataTable[self.dataTable.index.duplicated(keep=False)]}")
             self.dataTable = self.dataTable[~self.dataTable.index.duplicated()].copy()
-        if not self.saveAs == 'ecf32':
+        if not self.dataFormat == 'ecf32':
             self.dataTable = self.dataTable.resample(f"{self.dataIntervalSeconds}s").nearest()
         if self.dataTable.index.unit=='us':
             #Default in pandas >=3.0

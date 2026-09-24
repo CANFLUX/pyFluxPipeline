@@ -41,14 +41,14 @@ if __name__ == '__main__':
         **CSFormat
     )
 
-    print('Check ini then proceed')
+    # print('Check ini then proceed')
     # breakpoint()
     # SEEP = project(projectPath=projectPath).loadSiteConfiguration('SEEP').updateIni('TOB3_Flux_CSFormat_202606111732')
     
     fileSearch(
         projectPath=projectPath,
         siteID='SEEP',
-        searchPath=data_dump+'/RDEC1/2026/20260614',        
+        searchPath=data_dump+'/RDEC1/2026',        
         **Time_Series
     )
     # SeepFlux = discoverFiles(

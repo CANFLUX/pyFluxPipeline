@@ -28,7 +28,6 @@ class fileSet(sharedFields):
         self.fileGroups = pd.DataFrame([self.loadDict(os.path.join(self.metaPath,self.siteID,k,f)+'.yml') for k,v in self.fileInventory.items() for f in v.keys()])
         if 'traces' in self.fileGroups.columns:
             self.fileGroups['traces'] = [json.dumps(tr) for tr in self.fileGroups['traces']]
-
         self.siteConfig = self.loadSiteConfiguration(self.siteID)
 
 
@@ -40,25 +39,30 @@ class fileSearch(fileSet):
     findFiles: list = field(default_factory=list)
 
     def __post_init__(self):
-        
         super().__post_init__()
         # Serarch for new files not in inventory
         existingFiles =  [file for format in self.fileInventory.values() for sourceSet in format.values() for file in sourceSet['fileName']]
         newFileMetadata,newFileInventory = self.search(existingFiles)
         if newFileInventory is not None:
             # Append the new Inventory to the current
-            for (saveAs,sourceID),value in newFileInventory.items():
-                self.fileInventory.setdefault(saveAs,{})
-                self.fileInventory[saveAs].setdefault(sourceID,{key:[] for key in value.keys()})
+            for (dataFormat,sourceID),value in newFileInventory.items():
+                self.fileInventory.setdefault(dataFormat,{})
+                self.fileInventory[dataFormat].setdefault(sourceID,{key:[] for key in value.keys()})
                 for key,val in value.items():
-                    self.fileInventory[saveAs][sourceID][key] += val
+                    self.fileInventory[dataFormat][sourceID][key] += val
         # Read metadata from new inventory, merge with existing groups, or create new ones where applicable
         self.groupFiles(newFileMetadata,groupKeys=['tableName','loggerModel','program','fileFormat','dataIntervalSeconds','traces','timezone'])
         # Put any new file metadata into a template ini file
-        # self.generateIni()
-        for _,fileGroup in self.fileGroups.loc[self.fileGroups['saveAs'] == 'Database'].iterrows():
+        for _,fileGroup in self.fileGroups.loc[self.fileGroups['dataFormat'] == 'Database'].iterrows():
+            # If new, update first stage ini, otherwise just update dates
             if fileGroup['sourceID'] not in self.siteConfig.ini['rawData']['Database'].keys():
                 self.siteConfig.updateIni(sourceFile=fileGroup)
+            else:
+                self.siteConfig.updateRawSouces(fileGroup['dataFormat'],fileGroup['sourceID'],fileGroup['startDate'],fileGroup['stopDate'])
+        for _,fileGroup in self.fileGroups.loc[self.fileGroups['dataFormat'] == 'ecf32'].iterrows():
+            if fileGroup['sourceID'] not in self.siteConfig.ini['rawData']['ecf32'].keys():
+                self.siteConfig.updateRawSouces(fileGroup['dataFormat'],fileGroup['sourceID'],fileGroup['startDate'],fileGroup['stopDate'])
+                breakpoint()
         # Save updated inventory
         self.saveDict(self.fileInventory,self.fileInventoryPath)
 
@@ -74,7 +78,7 @@ class fileSearch(fileSet):
             newFileMetadata['fileTimestamp'] = newFileMetadata['fileTimestamp'].map(lambda x: x.isoformat())
             if self.sourceID is not None:
                 newFileMetadata['sourceID'] = self.sourceID
-            newFileInventory = newFileMetadata[['saveAs','sourceID','fileName','Processed','fileTimestamp']].groupby(['saveAs','sourceID']).agg(list).to_dict(orient='index')
+            newFileInventory = newFileMetadata[['dataFormat','sourceID','fileName','Processed','fileTimestamp']].groupby(['dataFormat','sourceID']).agg(list).to_dict(orient='index')
             return(newFileMetadata.drop(columns=['Processed','fileName','fileTimestamp']),newFileInventory)
         else:
             return(pd.DataFrame(),None)
@@ -95,37 +99,41 @@ class fileSearch(fileSet):
                 metadata = pd.DataFrame({f:out for f,out in zip(newFiles,executor.map(reader,newFiles))}).T
         self.logMessage(f'Metadata extracted in : {time.time()-T1} s')
         metadata['fileName'] = metadata.index
-        # metadata['referenceFile'] = metadata['fileName']
         return(metadata)
 
     def groupFiles(self,newFileMetadata,groupKeys):
         #Concat with existing records
+        self.fileGroups['referenceFile'] = 1
+        newFileMetadata['referenceFile'] = 0
         fileSets = pd.concat([self.fileGroups,newFileMetadata],ignore_index=True)
         fileSets['startDate'] = pd.to_datetime(fileSets['startDate'])
-        fileSets = fileSets.sort_values(by=['sourceID','startDate'])
+        fileSets = fileSets.sort_values(by=['sourceID','startDate'])#
         # It only matters if these columns are duplicated
-        duplicates = fileSets[groupKeys].duplicated().values
+        duplicates = fileSets[groupKeys].duplicated(keep=False).values
+        # Any duplicates that don't yet have a sourceID, arbitrarily select the first occurence as the reff
+        grouplicates = fileSets[groupKeys+['referenceFile','sourceID']].groupby(groupKeys).agg(list).reset_index()
+        grouplicates['referenceFile'] = grouplicates['referenceFile'].apply(sum)
+        for i,row in grouplicates.loc[grouplicates['referenceFile']==0].iterrows():
+            fileSets.loc[fileSets['sourceID']==row['sourceID'][0],'referenceFile']=1
+        referenceFile = fileSets.pop('referenceFile')
         # Name reference and configuration yaml
         fileSets['startDate'] = fileSets['startDate'].map(lambda x: x.isoformat())
         # Mask duplicates and ffill
-        sourceID_pre_group = fileSets[['saveAs','sourceID']].copy()
-        fileSets.loc[duplicates,['fileName','sourceID']] = np.nan
-        fileSets[['fileName','sourceID']] = fileSets[['fileName','sourceID']].ffill()
+        sourceID_pre_group = fileSets[['dataFormat','sourceID']].copy()
+        fileSets.loc[((duplicates)&(referenceFile==False)),['sourceID']] = np.nan
+        fileSets[['sourceID']] = fileSets[['sourceID']].ffill().bfill()
         sourceID_pre_group.index = fileSets['sourceID'].values
         for key,value in sourceID_pre_group.iterrows():
             if key != value['sourceID']:
-                vx = self.fileInventory[value['saveAs']].pop(value['sourceID'])
+                vx = self.fileInventory[value['dataFormat']].pop(value['sourceID'])
                 for k,v in vx.items():
-                    self.fileInventory[value['saveAs']][key][k]+=v
-        self.fileGroups = fileSets.groupby(['saveAs','sourceID']).first().reset_index()
+                    self.fileInventory[value['dataFormat']][key][k]+=v
+        self.fileGroups = fileSets.groupby(['dataFormat','sourceID']).first().reset_index()
         # Write groups that don't yet exist
         for _,row in self.fileGroups.iterrows():
             row = row.to_dict()
             row['traces'] = json.loads(row['traces'])
-            if row['saveAs'] == 'ecf32':
-                breakpoint()
-                # self.ecf32Metadata(kwargs=row)
-            fpath = f"{os.path.join(self.metaPath,self.siteID,row['saveAs'],row['sourceID'])}.yml"
+            fpath = f"{os.path.join(self.metaPath,self.siteID,row['dataFormat'],row['sourceID'])}.yml"
             if not os.path.isfile(fpath):
                 self.saveDict(row,fpath)
             else:

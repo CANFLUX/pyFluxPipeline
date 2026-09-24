@@ -55,11 +55,11 @@ class discoverFiles(sharedFields):
         # Find new files
         files = self.fileSearch()
         # Group by common configuration
-        self.fileSets = files.groupby(['saveAs','sourceID']).first().reset_index()
+        self.fileSets = files.groupby(['dataFormat','sourceID']).first().reset_index()
         files['processed'] = False
         files = files[
-            ['sourceID','fileName','saveAs','processed','fileTimestamp']
-            ].groupby(['saveAs','sourceID']).agg(list).to_dict(orient='index')
+            ['sourceID','fileName','dataFormat','processed','fileTimestamp']
+            ].groupby(['dataFormat','sourceID']).agg(list).to_dict(orient='index')
         for key,value in files.items():
             if key[0] not in self.fileInventory:
                 self.fileInventory[key[0]] = {}
@@ -74,10 +74,10 @@ class discoverFiles(sharedFields):
             # pop, format, and move to end
             # traces = row.pop('traces')
             row['traces'] = json.loads(row['traces'])
-            if row['saveAs'] == 'ecf32':
+            if row['dataFormat'] == 'ecf32':
                 breakpoint()
                 # self.ecf32Metadata(kwargs=row)
-            self.saveDict(row,f"{os.path.join(self.metaPath,row['saveAs'],row['sourceID'])}.yml")
+            self.saveDict(row,f"{os.path.join(self.metaPath,row['dataFormat'],row['sourceID'])}.yml")
         self.saveDict(self.fileInventory,self.fileInventoryPath)
         
     def fileSearch(self):
@@ -133,7 +133,7 @@ class discoverFiles(sharedFields):
         rawHighfrequency = self.siteConfig.ini['rawData']['ecf32']
         first = self.siteConfig.ini['Processing']['FirstStage']
         for _,file in self.fileSets.iterrows():
-            if file['saveAs'] == 'Database' and file['sourceID'] not in rawDatabase:
+            if file['dataFormat'] == 'Database' and file['sourceID'] not in rawDatabase:
                 self.dateRange = [file['fileTimestamp'],None]
                 inputDates = CommentedSeq(self.dateRange)
                 inputDates.yaml_set_anchor(f'{file["sourceID"]}.inputDates')
@@ -165,13 +165,13 @@ class discoverFiles(sharedFields):
                     else:
                         print('Issue ????')
                         breakpoint()
-            elif file['saveAs'] == 'ecf32' and file['sourceID'] not in rawHighfrequency:
+            elif file['dataFormat'] == 'ecf32' and file['sourceID'] not in rawHighfrequency:
                 self.dateRange = [file['fileTimestamp'],None]
                 inputDates = CommentedSeq(self.dateRange)
                 inputDates.yaml_set_anchor(f'{file["sourceID"]}.inputDates')
                 rawHighfrequency[file['sourceID']] = inputDates
                 
-            elif file['saveAs'] is None:
+            elif file['dataFormat'] is None:
                 continue
             elif file['sourceID'] not in rawDatabase and file['sourceID'] not in rawHighfrequency:
                 print('Issue ????')

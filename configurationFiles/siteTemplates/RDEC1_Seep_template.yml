@@ -28,7 +28,7 @@ sensors:
     ySeparation: 0.125
     verticalSeparation: 0
   TC1:
-    modelName: fast_t_sensor #100K6A1A
+    modelName: 100K6A1A
     serialNumber: 3
     dateIn: *V1_dateIn
     dateOut: *V1_dateOut

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from helperFunctions import baseClass, randomID
 import numpy as np
-
+import random
 mdMap = baseClass.mdMap
 
 sensorTypes = {
@@ -27,7 +27,7 @@ class common(baseClass.baseDataClass):
         metadata = mdMap('The logger model, auto-filled from class name')
         )
     serialNumber: str = field(
-        default = '',
+        default = None,
         metadata = mdMap('Serial# (if known)')
         )
     hardwareID: str = field(init=False,repr=False)
@@ -38,7 +38,10 @@ class common(baseClass.baseDataClass):
             self.serialNumber = randomID.randomID(5)
         self.manufacturer = self.manufacturer.lower()
         self.modelName = self.modelName.lower()
-        self.hardwareID = f"{self.modelName}-{self.serialNumber}"
+        if self.serialNumber is None:
+            self.logMessage('Generating Random Serial No for Distincution Purpopes')
+            self.serialNumber = str(random.randint(0,99999)).zfill(5)
+        self.hardwareID = f"{self.modelName}_{self.serialNumber}"
 
         super().__post_init__()
 

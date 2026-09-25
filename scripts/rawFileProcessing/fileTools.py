@@ -1,9 +1,9 @@
-from scripts.rawFileProcessing.parseCSV import EddyProOutput, HOBOcsv, NARRcsv
-from scripts.database.database import database
+# from scripts.rawFileProcessing.parseCSV import EddyProOutput, HOBOcsv, NARRcsv
+# from scripts.database.database import database
 # from scripts.ecf32.ecf32 import ecf32
-from scripts.rawFileProcessing.processor import processor,getRawFileMetadata,readRawFileData
+from scripts.ecf32.ghgMetadata import ghgMetadataWriter,eddyproProjectWriter
+from scripts.rawFileProcessing.processor import getRawFileMetadata
 from scripts.rawFileProcessing.sharedFields import sharedFields
-from scripts.ecf32.ghgMetadata import ghgMetadata
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from functools import partial
@@ -74,9 +74,16 @@ class fileSearch(fileSet):
                     section:{key:value for key,value in ghgMetadata_group[section].to_dict().items()}
                     for section in ghgMetadata_group.index.get_level_values(0).unique()\
                         }
-                ghg = ghgMetadata.from_dict(ghgMetadata_group)
+                ghg = ghgMetadataWriter.from_dict(ghgMetadata_group)
                 ghg.setFileDescription(fileGroup['traces'])
-                ghg.writeFiles()
+                fname=f"{fileGroup['sourceID']}~{sg}"
+                fpath = f"{os.path.join(self.metaPath,self.siteID,fileGroup['dataFormat'],fileGroup['sourceID'])}.metadata"
+                ghg.writeFiles(fpath)
+                # breakpoint()
+                ep = eddyproProjectWriter()
+                ep.setDates(fileGroup['startDate'],fileGroup['stopDate'])
+                ep.fill(ghg)
+                # .writeFile(ghg,filepath=fpath.replace('.metadata','.eddypro'))
         # Save updated inventory
         self.saveDict(self.fileInventory,self.fileInventoryPath)
 

@@ -1,7 +1,7 @@
 from scripts.siteConfiguration.hardware import dataLogger,sensor,sensorTypes
 from helperFunctions.baseClass import spatialObject,mdMap
 from ruamel.yaml.scalarstring import LiteralScalarString
-from scripts.ecf32.ghgMetadata import ghgMetadata
+from scripts.ecf32.ghgMetadata import ghgMetadataWriter
 from scripts.defaultSettings import defaultSettings
 from scripts.traceAnalysis.traceParameters import firstStageTrace
 from ruamel.yaml.comments import CommentedSeq
@@ -95,12 +95,12 @@ class siteConfiguration(defaultSettings):
             }
         ).fillna('')
         ecGroups = self.sensorHistory.reset_index().groupby(['EC']).count()['index']
-        ecMeta = ghgMetadata()
+        ghgMetadata = ghgMetadataWriter()
         self.ecGroups = pd.concat([
             pd.DataFrame(index=[ecGroup],
                          data = {
                             (key,subKey):value for key,subSet in
-                            ecMeta.setSite(
+                            ghgMetadata.setSite(
                                 self,
                                 ecGroup.split(delimChar),
                                 start_date=self.sensorHistory.loc[self.sensorHistory.EC==ecGroup].index.min(),
@@ -110,9 +110,7 @@ class siteConfiguration(defaultSettings):
                          }
             )
             for ecGroup in ecGroups.index
-        ])
-        # breakpoint()
-        
+        ])        
         if writeNew:
             self.logMessage(f'saving files for {self.siteID}')
             self.saveConfigFile(self.fileName)

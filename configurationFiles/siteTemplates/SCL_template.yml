@@ -8,8 +8,8 @@ dataLoggers:
     modelName: CR1000x
     serialNumber: 1
   winterMet:
-    dateIn: 2024-09-15
-    dateOut: 2025-06-19
+    dateIn: 2024-09-15T00:00:00+00:00
+    dateOut: 2025-06-19T00:00:00+00:00
     modelName: CR10x
     serialNumber: 1
   aux1:

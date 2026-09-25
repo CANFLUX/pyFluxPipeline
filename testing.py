@@ -4,7 +4,7 @@ from scripts.newProject import createProject
 from scripts.project import project
 from scripts.siteConfiguration.siteConfiguration import siteConfiguration
 import os
-from scripts.ecf32.ecf32 import ecf32
+# from scripts.ecf32.ecf32 import ecf32
 import yaml
 
 def driveCheck(path):
@@ -34,12 +34,12 @@ if __name__ == '__main__':
         CSFormat = yaml.safe_load(f)
     with open('configurationFiles/rawFileSettings/Time_Series.yml') as f:
         Time_Series = yaml.safe_load(f) 
-    fileSearch(
-        projectPath=projectPath,
-        siteID='SEEP',
-        searchPath=data_dump+'/RDEC1/2026',        
-        **CSFormat
-    )
+    # fileSearch(
+    #     projectPath=projectPath,
+    #     siteID='SEEP',
+    #     searchPath=data_dump+'/RDEC1/2026',        
+    #     **CSFormat
+    # )
 
     # print('Check ini then proceed')
     # breakpoint()
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     fileSearch(
         projectPath=projectPath,
         siteID='SEEP',
-        searchPath=data_dump+'/RDEC1/2026',        
+        searchPath=data_dump+'/RDEC1/2026/20260614',        
         **Time_Series
     )
     # SeepFlux = discoverFiles(

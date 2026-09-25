@@ -5,13 +5,10 @@ import numpy as np
 
 mdMap = baseClass.mdMap
 
-# sensorSpecs = {
-#     'IRGASON-sonic':{},
-#     'IRGASON-irga':{
-#         'vpath':15.37
-#         'hpath':
-#     }
-# }
+sensorTypes = {
+'EC':['sonic','sonic-irga','irga','irga-closed','fast_t_sensor'],
+'Biomet': ['biomet']
+}
 
 @dataclass(kw_only=True)
 class common(baseClass.baseDataClass):
@@ -69,22 +66,13 @@ class sensorPosition():
     tubeLenght: float = field(default = 0.0,metadata=mdMap('Length of closed path tube'))
     tubeDiameter: float = field(default = 0.0,metadata=mdMap('Diameter of closed path tube'))
 
-    def getPosition(self,sensorType):
-        if sensorType not in ['sonic','sonic-irga','irga','irga-closed']:
-            return
-        elif sensorType in ['sonic','sonic-irga']:
-            if self.Zm is None:
-                self.logError('Specify measurement height')
-            # for v in ['northwardSeparation', 'eastwardSeparation',  'verticalSeparation', 'xSeparation', 'ySeparation']:
-            #     if getattr(self,v) is None:
-            #         setattr(self,v,0.0)
-        else:
-            if self.eastwardSeparation is None or self.northwardSeparation is None:
-                self.geographicSeparation()
-            elif self.xSeparation is None or self.ySeparation is None:
-                self.cartesianSeparation()
-            if self.verticalSeparation is None:
-                self.logError('Specify vertical separation')
+    def getPosition(self):
+        if self.eastwardSeparation is None or self.northwardSeparation is None:
+            self.geographicSeparation()
+        elif self.xSeparation is None or self.ySeparation is None:
+            self.cartesianSeparation()
+        if self.verticalSeparation is None:
+            self.logError('Specify vertical separation')
                 
     def geographicSeparation(self):
         # Convert to radians
@@ -118,16 +106,26 @@ class sensorPosition():
             self.xSeparation = float(Rv[0])
             self.ySeparation = float(Rv[1])
 
+    
 @dataclass(kw_only=True)
 class sensor(common,sensorPosition):
     sensorID: str = field(default=None)
-    sensorType: str = field(default=None,metadata=mdMap('type of sensor',options=['sonic','sonic-irga','irga','biomet']))
+    sensorType: str = field(default=None,metadata=mdMap('type of sensor',options=sensorTypes['EC']+sensorTypes['Biomet']))
+    sensorClass: str = field(default=None)
     
 
     def __post_init__(self):
         super().__post_init__()
-        if self.sensorType is not None:
-            self.getPosition(self.sensorType.lower())
+        self.logMessage('Update sensor checks?')
+        if self.sensorType.lower() in sensorTypes['EC']:
+            if self.sensorType in ['sonic','sonic-irga']:
+                if self.Zm is None:
+                    self.logError('Specify measurement height')
+            else:
+                self.getPosition()
+            self.sensorClass = 'EC'
+        elif self.sensorType.lower() in sensorTypes['Biomet']:
+            self.sensorClass = 'Biomet'
         
         if self.sensorID is None:
             self.sensorID = self.hardwareID
@@ -140,7 +138,7 @@ class sensor(common,sensorPosition):
         else:
             self.__dataclass_fields__['tubeLenght'].repr=True
             self.__dataclass_fields__['tubeDiameter'].repr=True
-        if self.sensorType == 'irga' or self.sensorType == 'irga-close':
+        if self.sensorType == 'irga' or self.sensorType == 'irga-closed':
             self.__dataclass_fields__['Zm'].repr=False
         else:
             self.__dataclass_fields__['Zm'].repr=True

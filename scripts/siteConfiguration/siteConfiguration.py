@@ -1,4 +1,4 @@
-from scripts.siteConfiguration.hardware import dataLogger,sensor
+from scripts.siteConfiguration.hardware import dataLogger,sensor,sensorTypes
 from helperFunctions.baseClass import spatialObject,mdMap
 from ruamel.yaml.scalarstring import LiteralScalarString
 from scripts.ecf32.ghgMetadata import ghgMetadata
@@ -63,73 +63,83 @@ class siteConfiguration(defaultSettings):
         self.fileName = os.path.join(self.metaPath,self.siteID,"siteMetadata.yml")
         self.iniPath = os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini',f"{self.siteID}_config.yml")
         if not os.path.isfile(self.fileName):
-            self.validateConfiguration(writeNew=True)
+            self.getSensorGroups(writeNew=True)
             self.loadIni(writeNew=True)
         else:
-            self.sensorGroups = pd.read_csv(os.path.join(self.metaPath,self.siteID,"sensorGroups.csv"),header=[0,1],index_col=[0])
+            self.ecGroups = pd.read_csv(os.path.join(self.metaPath,self.siteID,"ecGroups.csv"),header=[0,1],index_col=[0])
             self.sensorHistory = pd.read_csv(os.path.join(self.metaPath,self.siteID,"sensorHistory.csv"),index_col=[0])
             self.sensorHistory.index = pd.to_datetime(self.sensorHistory.index)
+            self.getSensorGroups()
             self.loadIni()
 
-    def validateConfiguration(self,writeNew):
-        # dataloggers first
-        IDs = list(self.dataLoggers.keys())
-        for id in IDs:
-            params = self.dataLoggers.pop(id)
-            params = dataLogger.from_dict(params)
-            self.dataLoggers[params.hardwareID] = params
-        # Then sensors
-        IDs = list(self.sensors.keys())
-        for id in IDs:
-            params = self.sensors.pop(id)
-            params = sensor.from_dict(params)
-            self.sensors[params.hardwareID] = params
-        dates = []
-        for k,v in self.sensors.items():
-            if v.dateIn.tzinfo is None:
-                self.logError(f'Error in {self.siteID}: dateIn:{v.dateIn}, must specify UTC offset in yaml timestamp, e.g., +00:00, -06:00, etc. ')
-            if v.dateOut is not None:
-                if v.dateOut.tzinfo is None:
-                    self.logError(f'Error in {self.siteID}: dateOut: {v.dateOut}, must specify UTC offset in yaml timestamp, e.g., +00:00, -06:00, etc. ')
-                rng = pd.date_range(
-                    v.dateIn.astimezone(ZoneInfo(self.timezone)).isoformat(),
-                    v.dateOut.astimezone(ZoneInfo(self.timezone)).isoformat(),
-                    inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
-            else:
-                rng = pd.date_range(
-                    v.dateIn.astimezone(ZoneInfo(self.timezone)).isoformat(),
-                    datetime.now().astimezone(ZoneInfo(self.timezone)).isoformat(),inclusive='left',freq=f"{self.dataIntervalSeconds}s").floor(f"{self.dataIntervalSeconds}s")
-            dates.append(pd.DataFrame(index=rng,data={k:[k for i in range(rng.shape[0])]}))
-        self.sensorGroups(dates)
-        if writeNew:
-            self.logMessage(f'saving files for {self.siteID}')
-            self.saveConfigFile(self.fileName)
-            self.sensorGroups.to_csv(os.path.join(self.metaPath,self.siteID,"sensorGroups.csv"))
-            self.sensorHistory.to_csv(os.path.join(self.metaPath,self.siteID,"sensorHistory.csv"))
-
-    def sensorGroups(self,dates):
+    def getSensorGroups(self,writeNew=True):
+        ecSensors = []
+        biometSensors = []
+        self.validateSensors()
+        for sensorID,sensorParams in self.sensors.items():
+            rng = [v.astimezone(ZoneInfo(self.timezone)).isoformat() for v in 
+                [sensorParams.dateIn,(sensorParams.dateOut or datetime.now())]]
+            freq = f"{self.dataIntervalSeconds}s"
+            rng = pd.date_range(rng[0],rng[1],inclusive='left',freq=freq).floor(f"{self.dataIntervalSeconds}s")
+            srng = pd.DataFrame(index=rng,data={sensorID:[sensorID for i in range(rng.shape[0])]})
+            if sensorParams.sensorClass == 'EC':
+                ecSensors.append(srng)
+            elif sensorParams.sensorClass == 'Biomet':
+                biometSensors.append(srng)
+        
         # Group system sensors
-        self.sensorHistory = pd.concat(dates,axis=1).fillna('')
-        self.sensorHistory['sensorGroup'] = self.sensorHistory.agg('_'.join,axis=1).str.replace(r'(_)\1+', '_', regex=True).str.strip('_')
-        self.sensorHistory = self.sensorHistory[['sensorGroup']]
-        tmp = self.sensorHistory.reset_index().groupby(['sensorGroup']).count()
-        groupMeta = ghgMetadata()
-        self.sensorGroups = pd.concat([
-            pd.DataFrame(index=[sensorGroup],
+        delimChar = ';'
+        self.sensorHistory = pd.DataFrame(data={
+            'EC':pd.concat(ecSensors,axis=1).fillna('').agg(delimChar.join,axis=1).str.replace(rf'({delimChar})\1+', delimChar, regex=True).str.strip(delimChar),
+            'Biomet':pd.concat(biometSensors,axis=1).fillna('').agg(delimChar.join,axis=1).str.replace(rf'({delimChar})\1+', delimChar, regex=True).str.strip(delimChar)
+            }
+        ).fillna('')
+        ecGroups = self.sensorHistory.reset_index().groupby(['EC']).count()['index']
+        ecMeta = ghgMetadata()
+        self.ecGroups = pd.concat([
+            pd.DataFrame(index=[ecGroup],
                          data = {
                             (key,subKey):value for key,subSet in
-                            groupMeta.setSite(
+                            ecMeta.setSite(
                                 self,
-                                sensorGroup.split('_'),
-                                start_date=self.sensorHistory.loc[self.sensorHistory.sensorGroup==sensorGroup].index.min(),
-                                stop_date=self.sensorHistory.loc[self.sensorHistory.sensorGroup==sensorGroup].index.max(),
+                                ecGroup.split(delimChar),
+                                start_date=self.sensorHistory.loc[self.sensorHistory.EC==ecGroup].index.min(),
+                                stop_date=self.sensorHistory.loc[self.sensorHistory.EC==ecGroup].index.max(),
                                 ).items()
                             for subKey,value in subSet.items()
                          }
             )
-            for sensorGroup in tmp.index
+            for ecGroup in ecGroups.index
         ])
-          
+        # breakpoint()
+        
+        if writeNew:
+            self.logMessage(f'saving files for {self.siteID}')
+            self.saveConfigFile(self.fileName)
+            self.ecGroups.to_csv(os.path.join(self.metaPath,self.siteID,"ecGroups.csv"))
+            self.sensorHistory.to_csv(os.path.join(self.metaPath,self.siteID,"sensorHistory.csv"))
+    
+    def validateSensors(self):
+        def tzVerify(obj):
+            if obj.dateIn.tzinfo is None:
+                self.logError(f'Error in {self.siteID} {obj.modelName}: dateIn:{obj.dateIn}, must specify UTC offset in yaml timestamp, e.g., +00:00, -06:00, etc. ')
+            elif obj.dateOut is not None and obj.dateOut.tzinfo is None:
+                self.logError(f'Error in {self.siteID} {obj.modelName}: dateOut: {obj.dateOut}, must specify UTC offset in yaml timestamp, e.g., +00:00, -06:00, etc. ')
+
+        # dataloggers first
+        loggerIDs = list(self.dataLoggers.keys())
+        for id in loggerIDs:
+            params = self.dataLoggers.pop(id)
+            params = dataLogger.from_dict(params)
+            self.dataLoggers[params.hardwareID] = params
+            tzVerify(self.dataLoggers[params.hardwareID])
+        # Then sensors
+        sensorIDs = list(self.sensors.keys())
+        for id in sensorIDs:
+            params = self.sensors.pop(id)
+            params = sensor.from_dict(params)
+            self.sensors[params.hardwareID] = params
+            tzVerify(self.sensors[params.hardwareID])
     
     def loadIni(self,writeNew=False):
         if os.path.isfile(self.iniPath) and not writeNew:
@@ -174,8 +184,6 @@ class siteConfiguration(defaultSettings):
                 notes='default time-trace (seconds since unix epoch)').to_dict()
         else:
             first[self.posixName]['inputFiles'][f"{sourceFile['sourceID']}.{self.posixName}"] = inputDates
-        if type(sourceFile['traces']) is str:
-            sourceFile['traces'] = json.loads(sourceFile['traces'])
         for value in sourceFile['traces'].values():
             if value['ignore']:
                 continue

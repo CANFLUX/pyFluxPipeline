@@ -2,6 +2,7 @@ instrument:
   csat3: [u,v,w,ts,anemometer_diagnostic]
   irgason: [u,v,w,ts,anemometer_diagnostic,co2,h2o,co2_signal,h2o_signal]
   li7700: [ch4,ch4_signal,diag_77]
+  fast_t_sensor: [fast_t]
 variable:
   u: [Ux]
   v: [Uy]

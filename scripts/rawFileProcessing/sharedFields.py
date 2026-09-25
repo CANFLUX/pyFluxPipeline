@@ -1,6 +1,6 @@
 # from scripts.database.database import database
 from scripts.project import project
-from scripts.ecf32.ecf32 import ecf32
+# from scripts.ecf32.ecf32 import ecf32
 # from helperFunctions.baseClass import baseDataClass, mdMap
 # from scripts.defaultSettings import defaultSettings
 # from scripts.project import project

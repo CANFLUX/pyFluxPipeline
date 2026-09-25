@@ -4,11 +4,14 @@ from configparser import ConfigParser
 from dataclasses import dataclass, field
 from helperFunctions.baseClass import baseDataClass
 
-configPath = os.path.join(os.path.split(__file__)[0].split('scripts')[0],'configurationFiles')
+configPath = os.path.join(os.path.split(__file__)[0].split('scripts')[0],'configurationFiles','ghgTemplates')
 
 eddyproMetadataTemplate = ConfigParser()
 eddyproMetadataTemplate.read(os.path.join(configPath,'template.metadata'))
+eddyproProjectTemplate = ConfigParser()
+eddyproProjectTemplate.read(os.path.join(configPath,'template.eddypro'))
 translator = baseDataClass().loadDict(os.path.join(configPath,'ghgTranslations.yml'))
+
 
 def measurementType(units):
     # Translate to eddypro specific expectation (gas samples only)
@@ -98,7 +101,10 @@ class ghgMetadata(baseDataClass):
         ix = 0
         for i,sensor in enumerate(sensorSet):
             ix += 1
-            sensor = siteConfig.sensors[sensor]
+            try:
+                sensor = siteConfig.sensors[sensor]
+            except:
+                breakpoint()
             self.Instruments[f"instr_{ix}_manufacturer"] = sensor.manufacturer
             self.Instruments[f"instr_{ix}_model"] = sensor.modelName
             self.Instruments[f"instr_{ix}_id"] = sensor.sensorID
@@ -125,29 +131,39 @@ class ghgMetadata(baseDataClass):
                     self.Instruments[f"instr_{ix}_tube_length"]=0.0
                     self.Instruments[f"instr_{ix}_tube_diameter"]=0.0
                     self.Instruments[f"instr_{ix}_tube_flowrate"]=0.00
-                # print('path length?')
-                # instr_2_vpath_length=1.0000
-                # instr_2_hpath_length=1.0000
+
+    def getInstrumentList(self):
+        # get list of instruments for cross referencing
+        self.instrumentList = [self.Instruments[f'instr_{i+1}_id'] for i,_ in enumerate([k for k in self.Instruments.keys() if k.endswith('_id')])]
 
 
     def setFileDescription(self,traces):
+        self.getInstrumentList()
         col_n = [k for k in self.FileDescription.keys() if k.startswith('col_1')]
         columns = {k.replace('_1_','_n_'):self.FileDescription.pop(k) for k in col_n}
-        print(columns)
-        for i,(k,v) in enumerate(traces.items()):
-            self.FileDescription[f'col_{i}_variable'] = self.translate('variable',k)
-            breakpoint()
-            self.FileDescription[f"col_{i}_instrument"] = v['sensorID']
-            # print(i,k,v)
-            # print()
-        breakpoint()
+        for i,values in enumerate(traces.values()):
+            variable = self.translate('variable',values['variableName'])
+            self.FileDescription[f'col_{i}_variable'] = variable
+            self.FileDescription[f"col_{i}_instrument"] = self.translate('instrument',variable)
 
     def translate(self,key,value):
-        for k,v in translator[key].items():
-            if value in v or value == v:
-                return(k)
-        # return(value)
-        return('')
+        if key in ['variable','measurementType']:
+            for key,v in translator[key].items():
+                if value in v or value == v:
+                    return(key)
+            return('')
+        elif key == 'instrument':
+            for instrument in self.instrumentList:
+                if instrument.split('-')[0] not in translator['instrument'].keys():
+                    self.logError(f'Add variables for {instrument.split('-')[0]}')
+                if value in translator['instrument'][instrument.split('-')[0]]:
+                    return(instrument)
+            self.logMessage(f'Could not par instrument for {value}')
+            return('')
+
+    def writeFiles(self):
+        self.logMessage('write here!')
+        breakpoint()
 
 
 

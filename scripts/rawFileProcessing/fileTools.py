@@ -1,6 +1,6 @@
 from scripts.rawFileProcessing.parseCSV import EddyProOutput, HOBOcsv, NARRcsv
 from scripts.database.database import database
-from scripts.ecf32.ecf32 import ecf32
+# from scripts.ecf32.ecf32 import ecf32
 from scripts.rawFileProcessing.processor import processor,getRawFileMetadata,readRawFileData
 from scripts.rawFileProcessing.sharedFields import sharedFields
 from scripts.ecf32.ghgMetadata import ghgMetadata
@@ -60,9 +60,23 @@ class fileSearch(fileSet):
             else:
                 self.siteConfig.updateRawSouces(fileGroup['dataFormat'],fileGroup['sourceID'],fileGroup['startDate'],fileGroup['stopDate'])
         for _,fileGroup in self.fileGroups.loc[self.fileGroups['dataFormat'] == 'ecf32'].iterrows():
-            if fileGroup['sourceID'] not in self.siteConfig.ini['rawData']['ecf32'].keys():
-                self.siteConfig.updateRawSouces(fileGroup['dataFormat'],fileGroup['sourceID'],fileGroup['startDate'],fileGroup['stopDate'])
-                breakpoint()
+            # if fileGroup['sourceID'] not in self.siteConfig.ini['rawData']['ecf32'].keys():
+            self.siteConfig.updateRawSouces(fileGroup['dataFormat'],fileGroup['sourceID'],fileGroup['startDate'],fileGroup['stopDate'])
+            
+        # # Iterate through groups, creaet metadata file for each sensor orientation that exits
+        # for group in sensorHistory.loc[((sensorHistory.index>=kwargs['startDate'])&(sensorHistory.index<=kwargs['stopDate'])),'sensorGroup'].unique():
+            startDate = self.siteConfig.sensorHistory.index>=fileGroup['startDate']
+            stopDate = self.siteConfig.sensorHistory.index<=(fileGroup['stopDate'] or self.siteConfig.sensorHistory.index.max())
+            ecGroups = self.siteConfig.sensorHistory.loc[startDate & stopDate,'EC'].unique()
+            for sg in ecGroups:
+                ghgMetadata_group = self.siteConfig.ecGroups.loc[sg]
+                ghgMetadata_group = {
+                    section:{key:value for key,value in ghgMetadata_group[section].to_dict().items()}
+                    for section in ghgMetadata_group.index.get_level_values(0).unique()\
+                        }
+                ghg = ghgMetadata.from_dict(ghgMetadata_group)
+                ghg.setFileDescription(fileGroup['traces'])
+                ghg.writeFiles()
         # Save updated inventory
         self.saveDict(self.fileInventory,self.fileInventoryPath)
 
@@ -129,10 +143,10 @@ class fileSearch(fileSet):
                 for k,v in vx.items():
                     self.fileInventory[value['dataFormat']][key][k]+=v
         self.fileGroups = fileSets.groupby(['dataFormat','sourceID']).first().reset_index()
+        self.fileGroups['traces'] = [json.loads(tr) for tr in self.fileGroups['traces']]
         # Write groups that don't yet exist
         for _,row in self.fileGroups.iterrows():
             row = row.to_dict()
-            row['traces'] = json.loads(row['traces'])
             fpath = f"{os.path.join(self.metaPath,self.siteID,row['dataFormat'],row['sourceID'])}.yml"
             if not os.path.isfile(fpath):
                 self.saveDict(row,fpath)

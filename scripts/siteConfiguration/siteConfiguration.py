@@ -1,18 +1,16 @@
-from scripts.siteConfiguration.hardware import dataLogger,sensor,sensorTypes
-from helperFunctions.baseClass import spatialObject,mdMap
+from helperFunctions.baseClass import spatialObject,baseDataClass
+from scripts.traceAnalysis.traceParameters import firstStageTrace
+from scripts.siteConfiguration.hardware import hardwareModels
 from ruamel.yaml.scalarstring import LiteralScalarString
 from scripts.ecf32.ghgMetadata import ghgMetadataWriter
+from helperFunctions.baseClass import fromYamlDefault
 from scripts.defaultSettings import defaultSettings
-from scripts.traceAnalysis.traceParameters import firstStageTrace
+from scripts.defaultSettings import configPath
 from ruamel.yaml.comments import CommentedSeq
 from dataclasses import dataclass, field
-from datetime import datetime
-import pandas as pd
-import numpy as np
 from zoneinfo import ZoneInfo
-import json
+import pandas as pd
 import os
-
 @dataclass(kw_only=True)
 class configMetadata:
     AmerifluxID: str = None
@@ -41,104 +39,106 @@ class configTemplate:
         # if isinstance(self.Metadata,str):
         self.Metadata = configMetadata(**self.Metadata).__dict__
 
+siteConfiguration = fromYamlDefault(
+    os.path.join(configPath,'siteTemplates','siteConfiguration.yml'),
+)
+
 @dataclass(kw_only=True)
-class siteConfiguration(defaultSettings):
-    siteID: str = field(metadata = mdMap('Unique siteID code'))
-    siteName: str = field(default = None,metadata = mdMap('Long-format name'))
-    startDate: datetime = field(default = None, metadata = mdMap('Start Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
-    stopDate: datetime = field(default = None,metadata = mdMap('Stop Date will parse from string input (assuming Year-Month-Day order) For nested values, defaults to parent object, provide to override'))
-    sitePI: str = field(default = None,metadata=mdMap('Principal Investigator(s)'))
-    lat_lon: spatialObject = field(default_factory=lambda:[None,None],metadata = mdMap('List of [Latitude, Longitude] coordinates in WGS1984 stored in decimal degrees.  Will parse coordinates if provided as strings in DMS or DDM format. For nested values, assumed to be same as parent object.  Optionally to provide if different from parent value.'))
-    altitude: float = field(default = None,metadata = mdMap('Elevation (m.a.s.l).  For nested values, assumed to be same as parent object.  Optionally to provide if different from parent value.'))
-    canopyHeight: float = field(default=None,metadata=mdMap('optional parameter to describe general vegetation height at site.  Can be overridden by dynamic values where appropriate'))
-    siteDescription: str = field(default = None,metadata=mdMap('self explanatory'))
-    dataLoggers: dict = field(default_factory=dict)
-    sensors: dict = field(default_factory=dict)
-    dataSources: dict = field(default_factory=dict)
-    fromYAML: bool = field(default=True,repr=False)
+class siteMetadata(baseDataClass,siteConfiguration,defaultSettings):
+    projectPath: str = field(repr=False)
+    lat_lon: spatialObject
+    saveUpdates: bool = field(default=True,repr=False)
 
     def __post_init__(self):
         super().__post_init__()
         self.metaPath = os.path.join(self.projectPath,'Sites')
         self.fileName = os.path.join(self.metaPath,self.siteID,"siteMetadata.yml")
         self.iniPath = os.path.join(self.projectPath,'Database','Calculation_Procedures','TraceAnalysis_ini',f"{self.siteID}_config.yml")
-        if not os.path.isfile(self.fileName):
-            self.getSensorGroups(writeNew=True)
-            self.loadIni(writeNew=True)
-        else:
-            self.ecGroups = pd.read_csv(os.path.join(self.metaPath,self.siteID,"ecGroups.csv"),header=[0,1],index_col=[0])
-            self.sensorHistory = pd.read_csv(os.path.join(self.metaPath,self.siteID,"sensorHistory.csv"),index_col=[0])
+        if self.saveUpdates or not os.path.isfile(self.fileName):
+            self.validateSensors()
+        else:            
+            self.ecGroups = pd.read_csv(os.path.join(self.metaPath,self.siteID,"ecInstrumentGroups.csv"),header=[0,1],index_col=[0])
+            self.sensorHistory = pd.read_csv(os.path.join(self.metaPath,self.siteID,"instrumentHistory.csv"),index_col=[0])
             self.sensorHistory.index = pd.to_datetime(self.sensorHistory.index)
-            self.getSensorGroups()
-            self.loadIni()
+        self.loadIni()
 
-    def getSensorGroups(self,writeNew=True):
-        ecSensors = []
-        biometSensors = []
-        self.validateSensors()
-        for sensorID,sensorParams in self.sensors.items():
-            rng = [v.astimezone(ZoneInfo(self.timezone)).isoformat() for v in 
-                [sensorParams.dateIn,(sensorParams.dateOut or datetime.now())]]
-            freq = f"{self.dataIntervalSeconds}s"
-            rng = pd.date_range(rng[0],rng[1],inclusive='left',freq=freq).floor(f"{self.dataIntervalSeconds}s")
-            srng = pd.DataFrame(index=rng,data={sensorID:[sensorID for i in range(rng.shape[0])]})
-            if sensorParams.sensorClass == 'EC':
-                ecSensors.append(srng)
-            elif sensorParams.sensorClass == 'Biomet':
-                biometSensors.append(srng)
-        
-        # Group system sensors
-        delimChar = ';'
-        self.sensorHistory = pd.DataFrame(data={
-            'EC':pd.concat(ecSensors,axis=1).fillna('').agg(delimChar.join,axis=1).str.replace(rf'({delimChar})\1+', delimChar, regex=True).str.strip(delimChar),
-            'Biomet':pd.concat(biometSensors,axis=1).fillna('').agg(delimChar.join,axis=1).str.replace(rf'({delimChar})\1+', delimChar, regex=True).str.strip(delimChar)
-            }
-        ).fillna('')
-        ecGroups = self.sensorHistory.reset_index().groupby(['EC']).count()['index']
-        ghgMetadata = ghgMetadataWriter()
-        self.ecGroups = pd.concat([
-            pd.DataFrame(index=[ecGroup],
-                         data = {
-                            (key,subKey):value for key,subSet in
-                            ghgMetadata.setSite(
-                                self,
-                                ecGroup.split(delimChar),
-                                start_date=self.sensorHistory.loc[self.sensorHistory.EC==ecGroup].index.min(),
-                                stop_date=self.sensorHistory.loc[self.sensorHistory.EC==ecGroup].index.max(),
-                                ).items()
-                            for subKey,value in subSet.items()
-                         }
-            )
-            for ecGroup in ecGroups.index
-        ])        
-        if writeNew:
-            self.logMessage(f'saving files for {self.siteID}')
-            self.saveConfigFile(self.fileName)
-            self.ecGroups.to_csv(os.path.join(self.metaPath,self.siteID,"ecGroups.csv"))
-            self.sensorHistory.to_csv(os.path.join(self.metaPath,self.siteID,"sensorHistory.csv"))
-    
     def validateSensors(self):
-        def tzVerify(obj):
-            if obj.dateIn.tzinfo is None:
-                self.logError(f'Error in {self.siteID} {obj.modelName}: dateIn:{obj.dateIn}, must specify UTC offset in yaml timestamp, e.g., +00:00, -06:00, etc. ')
-            elif obj.dateOut is not None and obj.dateOut.tzinfo is None:
-                self.logError(f'Error in {self.siteID} {obj.modelName}: dateOut: {obj.dateOut}, must specify UTC offset in yaml timestamp, e.g., +00:00, -06:00, etc. ')
-
-        # dataloggers first
-        loggerIDs = list(self.dataLoggers.keys())
-        for id in loggerIDs:
-            params = self.dataLoggers.pop(id)
-            params = dataLogger.from_dict(params)
-            self.dataLoggers[params.hardwareID] = params
-            tzVerify(self.dataLoggers[params.hardwareID])
-        # Then sensors
-        sensorIDs = list(self.sensors.keys())
-        for id in sensorIDs:
-            params = self.sensors.pop(id)
-            params = sensor.from_dict(params)
-            self.sensors[params.hardwareID] = params
-            tzVerify(self.sensors[params.hardwareID])
-    
+        temp = self.instrumentation.copy()
+        self.instrumentation = {}
+        for kind,values in temp.items():
+            self.instrumentation.setdefault(kind,{})
+            if kind not in hardwareModels.keys():
+                self.logError(f"Instrumentation kind = {kind} not yet supported, see/update {hardwareModels['path']}")
+            for model in values.values():
+                modelName = model['modelName'].lower()
+                if modelName not in hardwareModels[kind].keys():
+                    self.logError(f"Instrumentation model = {modelName} of kind = {kind} not yet supported, see/update {hardwareModels['path']}")
+                model = hardwareModels[kind][modelName](**model)
+                self.instrumentation[kind][model.instrumentID] = model
+        self.instrumentHistory = pd.DataFrame()
+        if len(self.instrumentation['biometSensors']):
+            biometSensors = self.instrumentation['biometSensors']
+            biometHistory = pd.concat([
+                pd.Series(True,name=v.instrumentID,index=pd.date_range(v.dateStart.astimezone(ZoneInfo(self.timezone)),v.dateStop.astimezone(ZoneInfo(self.timezone)),freq=f"{self.databaseInterval}s"),)
+                for k,v in biometSensors.items()
+                ],axis=1)
+            biometInstrumentHistory = pd.Series('',index=biometHistory.index,name='biometSensors')
+            for sen in biometHistory.columns:
+                print(sen)
+                biometInstrumentHistory.loc[biometHistory[sen].notna()] += f"-{sen}"
+            biometInstrumentHistory = biometInstrumentHistory.str.strip('-')
+            self.instrumentHistory = pd.concat([biometInstrumentHistory])
+        if len(self.instrumentation['ecSensors']):
+            ecSensors = self.instrumentation['ecSensors']
+            ecHistory = pd.concat([
+                pd.Series(True,name=v.instrumentID,index=pd.date_range(v.dateStart.astimezone(ZoneInfo(self.timezone)),v.dateStop.astimezone(ZoneInfo(self.timezone)),freq=f"{self.databaseInterval}s"),)
+                if hasattr(v,'referenceSonic') and v.referenceSonic else
+                pd.Series(False,name=v.instrumentID,index=pd.date_range(v.dateStart.astimezone(ZoneInfo(self.timezone)),v.dateStop.astimezone(ZoneInfo(self.timezone)),freq=f"{self.databaseInterval}s"),)
+                for k,v in ecSensors.items() 
+            ],axis=1)
+            if ecHistory.sum(axis=1).max()>1:
+                self.logError(f"Only one reference sonic allowed per-timestamp {ecHistory.loc[ecHistory.sum(axis=1)>1]}")
+            # Select reference sonics and perform positional calculations based off this for all scalar systems
+            ecInstrumentHistory = pd.Series('',index=ecHistory.index,name='ecSensors')
+            for ref in ecHistory.columns[ecHistory.sum()>0]:
+                refSonic = self.instrumentation['ecSensors'][ref]
+                if refSonic.sensorType == 'sonic_irga':
+                    scalars = [ref]
+                else:
+                    scalars = []
+                # Find all sensors referenced to the given sonic
+                scalars += list(ecHistory.columns[ecHistory.loc[ecHistory[ref]==True].count()-ecHistory.loc[ecHistory[ref]==True].sum()>0])
+                ecInstrumentHistory.loc[ecHistory[ref].notna()] = ref
+                for scalar in scalars:
+                    ecInstrumentHistory.loc[ecHistory[scalar].notna()] += f"-{scalar}"
+            ecInstrumentHistory = ecInstrumentHistory.str.strip('-')
+            self.instrumentHistory = pd.concat([self.instrumentHistory,ecInstrumentHistory],axis=1)
+            # Generate the template .metadata file for the group, to be filled with FileDescription at a later stage (in case different files for same configuration)
+            ghgMetadata = ghgMetadataWriter()
+            self.ecInstrumentGroups = pd.concat(
+                [
+                    pd.DataFrame(
+                        index = [groupID],
+                        data = {(key,subKey):value 
+                                for key,subSet in ghgMetadata.setSite(
+                                    siteConfig = self,
+                                    sensorList = [ecSensors[sensor] for sensor in groupID.split('-')],
+                                    start_date = groupDates['index']['min'],
+                                    stop_date = groupDates['index']['max'],
+                                ).items() for subKey, value in subSet.items()
+                            }
+                    )
+                    for groupID,groupDates in ecInstrumentHistory.str.strip('-').reset_index().groupby('ecSensors').agg(['min','max']).iterrows()
+                ]
+            )
+        else:
+            self.ecInstrumentGroups = pd.DataFrame()
+            ecInstrumentHistory = pd.DataFrame()
+        self.logMessage(f'saving files for {self.siteID}')
+        self.saveConfigFile(self.fileName)
+        self.ecInstrumentGroups.to_csv(os.path.join(self.metaPath,self.siteID,"ecInstrumentGroups.csv"))
+        self.instrumentHistory.to_csv(os.path.join(self.metaPath,self.siteID,"instrumentHistory.csv"))
+        
     def loadIni(self,writeNew=False):
         if os.path.isfile(self.iniPath) and not writeNew:
             self.ini = self.loadDict(self.iniPath)
@@ -150,16 +150,16 @@ class siteConfiguration(defaultSettings):
                 }).__dict__
             self.saveDict(self.ini,self.iniPath)
 
-    def updateRawSouces(self,dataFormat,sourceID,startDate,stopDate):
+    def updateRawSouces(self,dataFrequency,sourceID,dateStart,dateStop):
         # Update the dates for raw files
-        if sourceID in self.ini['rawData'][dataFormat]:
-            inputDates = self.ini['rawData'][dataFormat][sourceID]
-            inputDates[0] = startDate
-            inputDates[1] = stopDate
+        if sourceID in self.ini['rawData'][dataFrequency]:
+            inputDates = self.ini['rawData'][dataFrequency][sourceID]
+            inputDates[0] = dateStart
+            inputDates[1] = dateStop
         else:
-            inputDates = CommentedSeq([startDate,stopDate])
+            inputDates = CommentedSeq([dateStart,dateStop])
             inputDates.yaml_set_anchor(f'{sourceID}.inputDates')
-            self.ini['rawData'][dataFormat][sourceID] = inputDates
+            self.ini['rawData'][dataFrequency][sourceID] = inputDates
         self.saveDict(self.ini,self.iniPath)
         return(inputDates)
 
@@ -171,7 +171,7 @@ class siteConfiguration(defaultSettings):
         elif sourceFile is None:
             self.logError('Must provide sourceID')
         first = self.ini['Processing']['FirstStage']
-        inputDates = self.updateRawSouces(sourceFile['dataFormat'],sourceFile['sourceID'],sourceFile['startDate'],sourceFile['stopDate'])
+        inputDates = self.updateRawSouces(sourceFile['dataFrequency'],sourceFile['sourceID'],sourceFile['dateStart'],sourceFile['dateStop'])
         if self.posixName not in first:
             first[self.posixName] = firstStageTrace(
                 variableName=self.posixName,

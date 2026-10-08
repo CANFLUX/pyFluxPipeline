@@ -1,0 +1,7 @@
+Ux: ['sonic','sonic_irga']
+Uy: ['sonic','sonic_irga']
+Uz: ['sonic','sonic_irga']
+T_Sonic: ['sonic','sonic_irga']
+TA_*: ['fast_t_sensor','temp_rh']
+SW_*: ['biomet']
+LW_*: ['biomet']

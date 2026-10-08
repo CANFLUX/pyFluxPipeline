@@ -16,6 +16,7 @@ class csvFile(sharedFields):
     
 
     def open_csv_file(self,mode='r'):
+        self.logError('formatMetadata!!!')
         rawFile = open(self.fileName,mode)
         self.preamble = []
         for i in range(self.skipRows):

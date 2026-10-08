@@ -1,11 +1,7 @@
-# from scripts.database.database import database
-from scripts.project import project
-# from scripts.ecf32.ecf32 import ecf32
-# from helperFunctions.baseClass import baseDataClass, mdMap
-# from scripts.defaultSettings import defaultSettings
-# from scripts.project import project
+from scripts.defaultSettings import fileMetadata
 from helperFunctions.baseClass import mdMap
 from dataclasses import dataclass,field
+from scripts.project import project
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
@@ -23,30 +19,20 @@ supportedFormats = {
     'MixedArray':'dat',
     'NARRcsv':'csv'
 }
-# superFloormats = {
-#     'HOBOcsv':None,
-#     'EddyProOutput':'LICOR',
-#     'GHG':'LICOR',
-#     'TOB3':'CSI',
-#     'TOA5':'CSI',
-#     'MixedArray':'CSI',
-#     'NARRcsv':None
-# }
-
 
 @dataclass(kw_only=True)
-class sharedFields(project):
+class sharedFields(project,fileMetadata):
     fileName: str = field(repr=False)
-    fileExtension: str = field(default=None,repr=False)
-    na_values: str = field(default=None,repr=False)
-    skipRows: int = field(default=None,repr=False)
-    headerRows: int = field(default=None,repr=False)
+    # fileExtension: str = field(default=None,repr=False)
+    # na_values: str = field(default=None,repr=False)
+    # skipRows: int = field(default=None,repr=False)
+    # headerRows: int = field(default=None,repr=False)
     
-    ignoreTraces: list = field(default_factory=list,repr=False,metadata=mdMap('Optional list of parameters to ignore'))
-    renameTraces: dict = field(default_factory=dict,repr=False,metadata=mdMap('Traces to rename'))
+    # ignoreTraces: list = field(default_factory=list,repr=False,metadata=mdMap('Optional list of parameters to ignore'))
+    # renameTraces: dict = field(default_factory=dict,repr=False,metadata=mdMap('Traces to rename'))
     
-    sourceID: str = field(default=None)
-    siteID: str = field(default=None)
+    # sourceID: str = field(default=None)
+    # siteID: str = field(default=None)
 
     tableName: str = field(default=None,init=False)
     tableSize: str = field(default=None,init=False)
@@ -56,13 +42,13 @@ class sharedFields(project):
     serialNumber: str = field(default=None,init=False)
     program: str = field(default=None,init=False)
     
-    fileFormat: str = field(default = None,metadata=mdMap('used to determine which file parser', options=list(supportedFormats.keys())))
+    # fileFormat: str = field(default = None,metadata=mdMap('used to determine which file parser', options=list(supportedFormats.keys())))
     dataIntervalSeconds: float = field(default = None,metadata=mdMap('Autoparsed from file'))
     timestampFormat: str = field(default = None,metadata=mdMap('provide if cannot be parsed automatically', options=list(supportedFormats.keys())))
     traces: dict = field(default_factory=dict,metadata=mdMap('Autoparsed from file or user provieded'))
 
-    startDate: datetime = field(default=None)
-    stopDate: datetime = field(default=None)
+    dateStart: datetime = field(default=None)
+    dateStop: datetime = field(default=None)
     dataFormat: str = field(default=None)
     
     mode: str = field(
@@ -73,16 +59,14 @@ class sharedFields(project):
     def __post_init__(self):
         if self.fileFormat is None:
             self.logMessage('NoFileFormat?')
-            # self.fileFormat = type(self).__name__
-            # self.logMessage(f'Setting fileFormat: {self.fileFormat}')
         if self.fileExtension is None and self.fileFormat is not None:
             self.fileExtension = supportedFormats[self.fileFormat]
         super().__post_init__()
 
     def formatMetadata(self):
-        self.startDate = self.startDate.replace(tzinfo=ZoneInfo(self.timezone))
-        if self.stopDate is not None:
-            self.stopDate = self.stopDate.replace(tzinfo=ZoneInfo(self.timezone))
+        self.dateStart = self.dateStart.replace(tzinfo=ZoneInfo(self.timezone))
+        if self.dateStop is not None:
+            self.dateStop = self.dateStop.replace(tzinfo=ZoneInfo(self.timezone))
         if self.dataIntervalSeconds > 60:
             self.dataFormat = 'Database'
         elif self.dataIntervalSeconds > 0 and self.dataIntervalSeconds<60:

@@ -25,18 +25,18 @@
 #         self.basePath = os.path.join(self.projectPath,'ecf32',self.siteID,self.sourceID)
 #         self.ecf32HeaderFile = os.path.join(self.basePath,'ecf32Variables.yml')
 #         #,sourceID,traces,dataInterval):
-#         siteConfig,sensorGroups,sensorHistory = self.loadSiteConfiguration(self.siteID,sensorGroups=True)
-#         if kwargs['stopDate'] is None:
-#             kwargs['stopDate'] = sensorHistory.index[-1]
+#         siteConfig,sensorGroups,sensorHistory = self.loadSiteMetadata(self.siteID,sensorGroups=True)
+#         if kwargs['dateStop'] is None:
+#             kwargs['dateStop'] = sensorHistory.index[-1]
         
 #         # self.ecf32Header = {variable['variableName']:{
 #         #     'units':variable['units'],
-#         #     'sensorID':variable['sensorID'],
+#         #     'instrumentID':variable['instrumentID'],
 #         #     'measurementType':measurementType(variable['units']),
 #         #     } for variable in kwargs['traces'].values() if not variable['ignore'] and variable['dtype'] == '<f4'}
 
 #         # Iterate through groups, creaet metadata file for each sensor orientation that exits
-#         for group in sensorHistory.loc[((sensorHistory.index>=kwargs['startDate'])&(sensorHistory.index<=kwargs['stopDate'])),'senstorGroup'].unique():
+#         for group in sensorHistory.loc[((sensorHistory.index>=kwargs['dateStart'])&(sensorHistory.index<=kwargs['dateStop'])),'senstorGroup'].unique():
 #             ghgMetadata_group = sensorGroups.loc[group]
 #             ghgMetadata_group = {section:{key:value for key,value in ghgMetadata_group[section].to_dict().items()} for section in ghgMetadata_group.index.get_level_values(0).unique()}
 #             test = ghgMetadata.from_dict(ghgMetadata_group)
@@ -100,11 +100,11 @@
 #     #         ecf32.tofile(os.path.join(fpath,fname))
     
 #     # def make(self,siteID):
-#     #     cfg = self.loadSiteConfiguration(siteID=siteID)
+#     #     cfg = self.loadSiteMetadata(siteID=siteID)
 #     #     self.ecf32Header = {
 #     #         'Project':Project(
-#     #             start_date=cfg.startDate,
-#     #             end_date=cfg.stopDate
+#     #             start_date=cfg.dateStart,
+#     #             end_date=cfg.dateStop
 #     #             ),
 #     #         'Site':Site(
 #     #             site_id=cfg.siteID,
@@ -117,7 +117,7 @@
 #     #         }
 #     #     sc=0
 #     #     for sensor,info in cfg.sensors.items():
-#     #         if info.sensorType in ['irga','sonic','sonic-irga','thermocouple']:
+#     #         if info.sensorType in ['irga','sonic','sonic_irga','thermocouple']:
 #     #             sc+=1
 #     #             if info.sensorType.startswith('sonic'):
 #     #                 # print(sensor,info.to_dict())

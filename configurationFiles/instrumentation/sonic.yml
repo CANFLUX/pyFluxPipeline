@@ -1,0 +1,5 @@
+Zm:
+northOffset:
+referenceSonic: true
+sensorType: sonic
+sensorClass: EC

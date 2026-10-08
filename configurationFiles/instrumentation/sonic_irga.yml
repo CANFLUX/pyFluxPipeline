@@ -1,0 +1,8 @@
+Zm:
+northOffset:
+referenceSonic: trues
+sensorType: sonic_irga
+sensorClass: EC
+xSeparation: 0
+ySeparation: 0
+zSeparation: 0

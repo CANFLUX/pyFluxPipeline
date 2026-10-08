@@ -1,17 +1,17 @@
 
-from scripts.database.database import database
+# from scripts.database.database import database
+from scripts.project import project
 from dataclasses import dataclass, field
 from helperFunctions.baseClass import mdMap
-from scripts.siteConfiguration.siteConfiguration import siteConfiguration
+from scripts.siteConfiguration.siteConfiguration import siteMetadata
+from datetime import datetime
 import shutil
 import os
 
-
-
 @dataclass(kw_only=True)
-class createProject(database):
+class createProject(project):
     reset: bool = field(default=False,repr=False)
-    projectPath: str = field(repr=True)
+    # projectPath: str = field(repr=True)
     sitesList: list = field(default_factory=lambda:['.templateSite'],metadata=mdMap('List of siteIDs'))
     
     def __post_init__(self):
@@ -40,17 +40,23 @@ class createProject(database):
     def newSite(self,siteID):
         if isinstance(siteID,str):
             if os.path.isfile(siteID):
-                temp = siteConfiguration.from_yaml(siteID,kwargs={'projectPath':self.projectPath})
+                # breakpoint()
+                temp = siteMetadata.from_yaml(siteID,kwargs={'projectPath':self.projectPath})
                 siteID = temp.siteID
             elif siteID.isalnum():
-                temp = siteConfiguration(siteID=siteID,projectPath=self.projectPath,template=True,startDate=f"{self.currentYear}-01-01 00:00:00+00:00")
+                temp = siteMetadata(
+                    siteID=siteID,
+                    projectPath=self.projectPath,
+                    dateStart=f"{datetime.now().year}-01-01 00:00:00+00:00",
+                    lat_lon = [None,None]
+                    )
                 siteID = temp.siteID
             else:
                 self.logError(f"Invalid siteID: {siteID}")
         # Load user provided template dict
         elif isinstance(siteID,dict):
             siteID['projectPath'] = self.projectPath
-            temp = siteConfiguration(**siteID)
+            temp = siteMetadata(**siteID)
             siteID = temp.siteID
         else:
         # Load default template

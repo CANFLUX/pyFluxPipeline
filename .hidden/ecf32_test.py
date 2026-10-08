@@ -33,7 +33,7 @@ if not os.path.isdir(projectPath):
     createProject(projectPath=projectPath,sitesList=[
         'configurationFiles/SCL_template.yml', # Template from preexisting metadata file for SCL
         'configurationFiles/RDEC1_Seep_template.yml', # Template from preexisting metadata file for RDEC1
-        # {'siteID': 'BSP','lat_lon': [69.319431, -135.478286],'startDate':'2026-06-01'}, # Template from dict for BSP
+        # {'siteID': 'BSP','lat_lon': [69.319431, -135.478286],'dateStart':'2026-06-01'}, # Template from dict for BSP
         # 'FIL', # Generic template for site FIL and ILL
         # 'ILL'
         ])

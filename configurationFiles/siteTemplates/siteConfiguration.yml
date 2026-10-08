@@ -1,0 +1,16 @@
+siteID:
+siteName: ''
+dateStart: 
+dateStop: '2028-03-31T23:59:59+00:00'
+timezone: 'UTC'
+sitePI: ''
+altitude: .nan
+canopyHeight: .nan
+siteDescription: ''
+lat_lon: 
+  - .nan
+  - .nan
+instrumentation: 
+  dataLoggers: {}
+  ecSensors: {}
+  biometSensors: {}

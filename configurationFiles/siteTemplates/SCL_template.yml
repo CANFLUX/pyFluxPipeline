@@ -1,77 +1,146 @@
 siteID: SCL
 siteName: Swiss Cheese Lake
 lat_lon: [69.2264167, -135.2519067]
-startDate: &V1_dateIn 2024-07-10T00:00:00+00:00
-dataLoggers:
-  main:
-    dateIn: *V1_dateIn
-    modelName: CR1000x
-    serialNumber: 1
-  winterMet:
-    dateIn: 2024-09-15T00:00:00+00:00
-    dateOut: 2025-06-19T00:00:00+00:00
-    modelName: CR10x
-    serialNumber: 1
-  aux1:
-    dateIn: *V1_dateIn
-    modelName: HOBO
-    serialNumber: 1
-  aux2:
-    dateIn: *V1_dateIn
-    modelName: HOBO
-    serialNumber: 2
-sensors:
-  CSAT3-UBC:
-    modelName: CSAT3
-    serialNumber: 1
-    dateIn: *V1_dateIn
-    dateOut: &V1_dateOut 2024-09-15T00:00:00+07:00
-    sensorType: sonic
-    Zm: &V1_Zm 3.285
-    northOffset: &V1_northOffset 33.0
-  LI7500-UBC:
-    modelName: LI7500
-    serialNumber: 1
-    dateIn: *V1_dateIn
-    dateOut: *V1_dateOut
-    sensorType: irga
-    northOffset: *V1_northOffset
-    xSeparation: 0.15
-    ySeparation: -0.06
-    verticalSeparation: 0
-  LI7700-UBC: 
-    modelName: LI7700
-    serialNumber: 1
-    dateIn: *V1_dateIn
-    dateOut: *V1_dateOut
-    sensorType: irga
-    northOffset: *V1_northOffset
-    xSeparation: 0.23
-    ySeparation: 0.14
-    verticalSeparation: 0
-  IRGASON:
-    modelName: IRGASON
-    serialNumber: 1
-    dateIn: &V2_dateIn 2025-08-01T00:00:00+07:00
-    sensorType: sonic-irga
-    Zm: *V1_Zm
-    northOffset: *V1_northOffset
-  LI7700:
-    modelName: LI7700
-    serialNumber: 2
-    dateIn: *V2_dateIn
-    sensorType: irga
-    northOffset: *V1_northOffset
-    xSeparation: 0.45
-    ySeparation: 0.13
-    verticalSeparation: -0.04
-  TC1:
-    modelName: TC
-    serialNumber: SSM
-    dateIn: *V2_dateIn
-    sensorType: biomet
-    northwardSeparation: -50
-    eastwardSeparation: -10 
+dateStart: &stationInstalled 2024-07-10T00:00:00+00:00
+dateStop: &stationDecommissioned 2028-03-31T23:59:59+00:00
+instrumentation:
+  dataLoggers:
+    main:
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+      modelName: CR1000x
+      serialNumber: 1
+      stationName: 'SCL_57840'
+    winterMet:
+      dateStart: &wxBreakStart 2024-09-15T00:00:00+00:00
+      dateStop: &wxBreakStop 2025-06-19T00:00:00+00:00
+      modelName: CR10x
+      serialNumber: 1
+      stationName: OverWinter
+    aux1:
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+      modelName: hobo
+      serialNumber: 1
+      stationName: SSM
+    aux2:
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+      modelName: hobo
+      serialNumber: 2
+      stationName: WSM
+  ecSensors:
+    CSAT3-UBC:
+      modelName: CSAT3
+      serialNumber: 1
+      referenceSonic: True
+      dateStart: *stationInstalled
+      dateStop: &ubcSensorsOut 2024-09-15T00:00:00+07:00
+      Zm: &V1_Zm 3.285
+      northOffset: &V1_northOffset 33.0
+    LI7500-UBC:
+      modelName: LI7500
+      serialNumber: 1
+      dateStart: *stationInstalled
+      dateStop: *ubcSensorsOut
+      xSeparation: 0.15
+      ySeparation: -0.06
+      zSeparation: 0
+    LI7700-UBC: 
+      modelName: LI7700
+      serialNumber: 1
+      dateStart: *stationInstalled
+      dateStop: *ubcSensorsOut
+      xSeparation: 0.23
+      ySeparation: 0.14
+      zSeparation: 0
+    IRGASON:
+      modelName: IRGASON
+      serialNumber: 1
+      referenceSonic: True
+      dateStart: &gscSensorsIn 2025-08-01T00:00:00+07:00
+      dateStop: *stationDecommissioned
+      Zm: *V1_Zm
+      northOffset: *V1_northOffset
+    LI7700:
+      modelName: LI7700
+      serialNumber: 2
+      dateStart: *gscSensorsIn # Add functionality for temporary removal?
+      dateStop: *stationDecommissioned # Add functionality for temporary removal?
+      xSeparation: 0.45
+      ySeparation: 0.13
+      zSeparation: -0.04
+    TC1:
+      modelName: 100k6a1a
+      serialNumber: 1
+      dateStart: *gscSensorsIn
+      dateStop: *stationDecommissioned
+      xSeparation: -10 
+      ySeparation: -50
+      zSeparation: 0
+  biometSensors:
+    HMP35A:
+      modelName: HMP35A
+      serialNumber: 68
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    NRLite:
+      modelName: NRLite
+      serialNumber: 69
+      dateStart: *stationInstalled
+      dateStop: *wxBreakStop
+    SN500:
+      modelName: SN500
+      serialNumber: 69
+      dateStart: *gscSensorsIn
+      dateStop: *stationDecommissioned
+    CS310_up:
+      modelName: cs310
+      serialNumber: up
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    thermocouple_SSM_5:
+      modelName: thermocouple
+      serialNumber: SSM_5cm
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    thermocouple_SSM_10:
+      modelName: thermocouple
+      serialNumber: SSM_10cm
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    thermocouple_SSM_50:
+      modelName: thermocouple
+      serialNumber: SSM_50cm
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    thermocouple_SSM_100:
+      modelName: thermocouple
+      serialNumber: SSM_100cm
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    thermocouple_WSM_5:
+      modelName: thermocouple
+      serialNumber: WSM_5cm
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    thermocouple_WSM_10:
+      modelName: thermocouple
+      serialNumber: WSM_10cm
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    thermocouple_WSM_50:
+      modelName: thermocouple
+      serialNumber: WSM_50cm
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    thermocouple_WSM_100:
+      modelName: thermocouple
+      serialNumber: WSM_100cm
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+
+    
 # dataSources:
 #   EC2024:
 #     fileNameMatch: eddypro_t_full_output_2025-05-02T224906_exp.csv

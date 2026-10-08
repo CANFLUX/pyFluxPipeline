@@ -1,14 +1,12 @@
 from helperFunctions.baseClass import baseDataClass,mdMap
 from helperFunctions.safeFormat import safeFormat,cleanString
 from ruamel.yaml.scalarstring import LiteralScalarString
+from scripts.defaultSettings import defaultSettings, firstStageMetDefaults
 from pandas.api.types import is_numeric_dtype
 from dataclasses import dataclass,field
 import numpy as np
 import fnmatch
 import os
-
-defaultSettings = baseDataClass().loadDict(os.path.join(os.getcwd(),'configurationFiles','defaultSettings.yml'))
-firstStageMetDefaults = baseDataClass().loadDict(os.path.join(os.getcwd(),'configurationFiles','firstStageMetDefaults.yml'))
 
 class sharedMethods(baseDataClass):
 
@@ -21,9 +19,9 @@ class sharedMethods(baseDataClass):
 class rawTrace(sharedMethods):
     variableName: str = field(default=None,metadata=mdMap('Name of the variable (must be filename safe, alphanumeric with underscores accepted)'))
     units: str = field(default='', metadata=mdMap(''))
-    dtype: str = field(default=defaultSettings['defaultDataType'],metadata=mdMap('data type (float32, int64, etc.)'))
+    dtype: str = field(default=defaultSettings.defaultDataType,metadata=mdMap('data type (float32, int64, etc.)'))
     originalVariable: str
-    sensorID: str = None
+    instrumentID: str = None
     ignore: bool = False
     notes: str = None
 
@@ -42,7 +40,7 @@ class rawTrace(sharedMethods):
 class firstStageTrace(sharedMethods):
     variableName: str = field(default=None,metadata=mdMap('Name of the variable (must be filename safe, alphanumeric with underscores accepted)'))
     units: str = field(default='', metadata=mdMap(''))
-    dtype: str = field(default=defaultSettings['defaultDataType'],metadata=mdMap('data type (float32, int64, etc.)'))
+    dtype: str = field(default=defaultSettings.defaultDataType,metadata=mdMap('data type (float32, int64, etc.)'))
     inputFiles: dict = None
     inputDates: list = field(default_factory=list,metadata=mdMap('date rang corresponding to input files (s)'),repr=False)
     
@@ -60,16 +58,18 @@ class firstStageTrace(sharedMethods):
         #     self.inputFiles = {f:d for f,d in zip(self.inputFiles,self.inputDates)}
         if not isinstance(self.inputFiles,dict):
             self.inputFiles = {self.inputFiles:self.inputDates}
-        defaultSettings = [firstStageMetDefaults[param] for param in firstStageMetDefaults if self.variableName.startswith(param)]
-        if len(defaultSettings)>0:
-            if len(defaultSettings)>1:
+        print(self.variableName)
+        try:
+            biometDefault = [firstStageMetDefaults[param] for param in firstStageMetDefaults.keys() if self.variableName.startswith(param)]
+        except:
+            breakpoint()
+        if len(biometDefault)>0:
+            if len(biometDefault)>1:
                 self.logError('Multiple defaults matching pattern, adjust method')
-            defaultSettings = defaultSettings[0]
-            for key,value in defaultSettings.items():
+            biometDefault = biometDefault[0]
+            for key,value in biometDefault.items():
                 self.__setattr__(key,value)
 
-        # if not np.issubdtype(self.dtype,np.floating):
-        #     self.linearInterpLimit = 0
         super().__post_init__()
 
     def defaultCheck(self):
@@ -84,7 +84,7 @@ class firstStageTrace(sharedMethods):
 class secondStageTrace(sharedMethods):
     variableName: str = field(default=None,metadata=mdMap('Name of the variable (must be filename safe, alphanumeric with underscores accepted)'))
     units: str = field(default='', metadata=mdMap(''))
-    dtype: str = field(default=defaultSettings['defaultDataType'],metadata=mdMap('data type (float32, int64, etc.)'))
+    dtype: str = field(default=defaultSettings.defaultDataType,metadata=mdMap('data type (float32, int64, etc.)'))
     linearInterpLimit: int = 0
     minMax: list = field(default_factory=lambda:[-np.inf,np.inf], metadata=mdMap('optional to set min/max clipping'))
     Evaluate: str = ''

@@ -1,0 +1,23 @@
+ecSensors:
+  irgason: sonic_irga
+  csat3: sonic
+  li7700: irga
+  li7500: irga
+  li7200: irga_closed
+  100k6a1a: fast_t_sensor
+biometSensors:
+  hmp35a: temp_rh
+  cnr4: biomet
+  nr01: biomet
+  nrlite: biomet
+  sn500: biomet
+  cs301: biomet
+  cs310: biomet
+  cs320: biomet
+  thermocouple: biomet
+  thermistor: biomet
+  pls: biomet
+dataLoggers:
+  cr1000x: dataLogger
+  cr10x: dataLogger
+  hobo: dataLogger

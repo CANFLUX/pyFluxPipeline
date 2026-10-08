@@ -1,24 +1,14 @@
-from helperFunctions.baseClass import baseDataClass
-from dataclasses import dataclass,field
-from datetime import datetime
+from helperFunctions.baseClass import fromYamlDefault,fromIniDefault
+import os
 
-@dataclass(kw_only=True)
-class defaultSettings(baseDataClass):
-    # Hidden parameter
-    databaseInterval: float = field(default=1800,init=False,repr=False) # Interval of database
-    useParallel: bool = field(default=True,repr=False)
+configPath = os.path.join(os.path.split(__file__)[0].split('scripts')[0],'configurationFiles')
 
-    # Public parameters
-    checkForUpdates: bool = field(default=False)
-    projectPath: str = field(repr=False) # Root path of project, all paths realative to this
-    dataIntervalSeconds: float = 1800.0 # Defaults to 1800s (30 min) for the database, however any format is acceptable for a given database folder
-    timezone: str = 'UTC' # defaults to UTC for simplicity, but can be set to any timezone on a site or data-source specific basis
-    intMask = -9999 # NO DATA value for integer data
-    defaultDataType = 'float32' # Any numeric type acceptable, float32 & int32 preferred for optimizing precisions vs. storage requirements
-    posixName = 'posix_time' # Filename of python time-trace (stored in posix format with int64 dtype)
-    datenumName = 'clean_tv' # Legacy variable to allow interoperability of generated database with Biomet.net
-    currentYear = datetime.now().year
+defaultSettings = fromYamlDefault(os.path.join(configPath,'defaults',"defaultSettings.yml"))
+firstStageMetDefaults = fromYamlDefault(os.path.join(configPath,'defaults',"firstStageMetDefaults.yml"),asDataclass=False)
 
-    def __pos__(self):
-        if self.debug:
-            self.useParallel = False
+eddyproTemplate = fromIniDefault(os.path.join(configPath,'ghgTemplates','eddyproTemplate.eddypro'))
+ghgTemplate = fromIniDefault(os.path.join(configPath,'ghgTemplates','ghgTemplate.metadata'))
+ghgTranslator = fromYamlDefault(os.path.join(configPath,'ghgTemplates','ghgTranslations.yml'),asDataclass=False)
+
+# variableInstrumentMap = fromYamlDefault(os.path.join(configPath,'rawFileSettings','variableInstrumentMap.yml'),asDataclass=False)
+fileMetadata = fromYamlDefault(os.path.join(configPath,'rawFileSettings','fileMetadata.yml'))

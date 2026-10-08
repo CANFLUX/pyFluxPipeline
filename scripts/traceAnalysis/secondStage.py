@@ -18,13 +18,13 @@ class secondStage(database):
         for siteID in self.sitesList:
             T1 = time()
             # load site configuration
-            siteConfig = self.loadSiteConfiguration(siteID)
+            siteConfig = self.loadSiteMetadata(siteID)
             # Assign all years if not otherwise specified            
             if self.years is None:
-                if siteConfig.stopDate is None:
-                    self.years = [i for i in range(siteConfig.startDate.year,self.currentYear+1)]
+                if siteConfig.dateStop is None:
+                    self.years = [i for i in range(siteConfig.dateStart.year,self.currentYear+1)]
                 else:
-                    self.years = [i for i in range(siteConfig.startDate.year,self.stopDate.year+1)]
+                    self.years = [i for i in range(siteConfig.dateStart.year,self.dateStop.year+1)]
             # create timestamp spanning years
             posixYearIndex = self.posixYears(self.dataIntervalSeconds)
             startTime = posixYearIndex[posixYearIndex==self.years[0]].index.values[0]

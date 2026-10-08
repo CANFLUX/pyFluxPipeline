@@ -1,43 +1,49 @@
-import os
-from functools import partial
+
+import numpy as np
 from datetime import datetime
 from configparser import ConfigParser
-from dataclasses import dataclass, field, make_dataclass
+from dataclasses import dataclass
 from helperFunctions.baseClass import baseDataClass
+from scripts.defaultSettings import eddyproTemplate, ghgTemplate, ghgTranslator
 
-def getSec(cfg,sec):
-    return(dict(cfg[sec]))
+# def getSec(cfg,sec):
+#     breakpoint()
+#     return(dict(cfg[sec]))
 
-configPath = os.path.join(os.path.split(__file__)[0].split('scripts')[0],'configurationFiles','ghgTemplates')
+# configPath = os.path.join(os.path.split(__file__)[0].split('scripts')[0],'configurationFiles','ghgTemplates')
 
-# Read config files as templats for dataclasses
-ghgMetadata = ConfigParser()
-ghgMetadata.read(os.path.join(configPath,'template.metadata'))
-ghgMetadata = make_dataclass('dotEddyPro',[(fld,dict,field(default_factory=partial(getSec,cfg=ghgMetadata,sec=fld))) for fld in ghgMetadata.keys()])
+# breakpoint()
+# fromIniDefault(os.path.join(configPath,'template.metadata'))
+# # Read config files as templats for dataclasses
+# ghgMetadata = ConfigParser()
+# ghgMetadata.read()
 
-eddyproProject = ConfigParser()
-eddyproProject.read(os.path.join(configPath,'template.eddypro'))
-eddyproProject = make_dataclass('dotEddyPro',[(fld,dict,field(default_factory=partial(getSec,cfg=eddyproProject,sec=fld))) for fld in eddyproProject.keys()])
+# #     breakpoint()
+# ghgMetadata = make_dataclass('dotEddyPro',[(fld,dict,field(default_factory=partial(getSec,cfg=ghgMetadata,sec=fld))) for fld in ghgMetadata.keys()])
 
-yamlTranslator = baseDataClass().loadDict(os.path.join(configPath,'ghgTranslations.yml'))
+# eddyproProject = ConfigParser()
+# eddyproProject.read(os.path.join(configPath,'template.eddypro'))
+# eddyproProject = make_dataclass('dotEddyPro',[(fld,dict,field(default_factory=partial(getSec,cfg=eddyproProject,sec=fld))) for fld in eddyproProject.keys()])
+
+# ghgTranslator = baseDataClass().loadDict(os.path.join(configPath,'ghgTranslations.yml'))
 
 @dataclass(kw_only=True)
-class eddyproProjectWriter(baseDataClass,eddyproProject):
+class eddyproProjectWriter(baseDataClass,eddyproTemplate):
 
     def __post_init__(self):
         self.Project['file+type'] = 7
         super().__post_init__()
 
-    def setDates(self,startDate,stopDate):
-        startDate=datetime.fromisoformat(startDate)
-        if stopDate is None: stopDate = datetime.now()
-        else: stopDate=datetime.fromisoformat(stopDate)
-        for key,value in eddyproProject().__dict__.items():
+    def setDates(self,dateStart,dateStop):
+        dateStart=datetime.fromisoformat(dateStart)
+        if dateStop is None: dateStop = datetime.now()
+        else: dateStop=datetime.fromisoformat(dateStop)
+        for key,value in eddyproTemplate().__dict__.items():
             for dval in [k.split('start_date')[0] for k in value if 'start_date' in k]:
-                value[f"{dval}start_date"] = startDate.strftime('%Y-%m-%d')
-                value[f"{dval}start_time"] = startDate.strftime('%H:%M')
-                value[f"{dval}end_date"] = stopDate.strftime('%Y-%m-%d')
-                value[f"{dval}end_time"] = stopDate.strftime('%H:%M')
+                value[f"{dval}start_date"] = dateStart.strftime('%Y-%m-%d')
+                value[f"{dval}start_time"] = dateStart.strftime('%H:%M')
+                value[f"{dval}end_date"] = dateStop.strftime('%Y-%m-%d')
+                value[f"{dval}end_time"] = dateStop.strftime('%H:%M')
             setattr(self,key,value)
 
     def fill(self,ghgMetadataFile):
@@ -56,7 +62,7 @@ class eddyproProjectWriter(baseDataClass,eddyproProject):
     def writeFile(self):
         # self.fill(ghgMetadataFile)
         epOut = ConfigParser()
-        for key in eddyproProject.__annotations__:
+        for key in eddyproTemplate.__annotations__:
             if key == 'DEFAULT':
                 continue
             epOut.add_section(key)
@@ -67,24 +73,38 @@ class eddyproProjectWriter(baseDataClass,eddyproProject):
 
 
 
+@dataclass(kw_only=True)
+class coordinateTransformation:
+    Zm: float
+    northOffset: float
+
+    def __post_init__(self):        
+        # Convert to radians
+        # **Note**: north offset is relative to geographic (meteorologic) north, while x,y offsets are in cartesian coordinates.  To perform the coordinate rotation properly theta must be converted to cartesian coordinate (positive is counter-clockwise from the x axis)
+        theta = np.deg2rad(270-self.northOffset)
+        # Calculate counter-clockwise rotation matrix
+        self.R = np.array([[np.cos(theta),-np.sin(theta)],[np.sin(theta),np.cos(theta)]])
+
+    def geographicSeparation(self,xSeparation,ySeparation):
+        # Evaluate rotation matrix.
+        v = np.array([[xSeparation,ySeparation]])
+        Rv = (self.R*v)
+        Rv = Rv.sum(axis=1).round(3)
+        northwardSeparation = float(Rv[1])
+        eastwardSeparation = float(Rv[0])
+        return(northwardSeparation,eastwardSeparation)
+
 # Metadata format of LICOR .ghg files
 @dataclass(kw_only=True)
-class ghgMetadataWriter(baseDataClass,ghgMetadata):
+class ghgMetadataWriter(baseDataClass,ghgTemplate):
 
     def __post_init__(self):
         self.Project['creation_date'] = datetime.now().isoformat()
         self.Project['last_change_date'] = self.Project['creation_date']
 
-    def setSite(self,siteConfig,sensorList,start_date=None,stop_date=None,retrunDict=True):
-        if start_date is None:
-            self.Project['start_date'] = siteConfig.startDate.isoformat()
-        else:
-            self.Project['start_date'] = start_date.isoformat()
-        if stop_date is None:
-            if siteConfig.stopDate:
-                self.Project['end_date'] = siteConfig.stopDate.isoformat()
-        else:
-            self.Project['end_date'] = stop_date.isoformat()
+    def setSite(self,siteConfig,sensorList,start_date=None,stop_date=None,returnDict=True):
+        self.Project['start_date'] = start_date.isoformat()
+        self.Project['end_date'] = stop_date.isoformat()
         self.Site['site_id'] = siteConfig.siteID
         if siteConfig.siteName:
             self.Site['site_name'] = siteConfig.siteName
@@ -94,41 +114,37 @@ class ghgMetadataWriter(baseDataClass,ghgMetadata):
             self.Site['altitude'] = siteConfig.altitude
         if siteConfig.canopyHeight:
             self.Site['canopy_height'] = siteConfig.canopyHeight
-        self.setInstruments(siteConfig,sensorList)
-        if retrunDict:
+        self.setInstruments(sensorList)
+        if returnDict:
             return(self.to_dict())
 
-    def setInstruments(self,siteConfig,sensorSet):
+    def setInstruments(self,sensorSet):
         ix = 0
         for i,sensor in enumerate(sensorSet):
             ix += 1
-            try:
-                sensor = siteConfig.sensors[sensor]
-            except:
-                breakpoint()
             self.Instruments[f"instr_{ix}_manufacturer"] = sensor.manufacturer
             self.Instruments[f"instr_{ix}_model"] = sensor.modelName
-            self.Instruments[f"instr_{ix}_id"] = sensor.sensorID
-            if 'sonic' in sensor.sensorType:
+            self.Instruments[f"instr_{ix}_id"] = sensor.instrumentID
+            if ix == 1 and 'sonic' in sensor.sensorType:#if 'sonic' in sensor.sensorType:
                 if ix != 1:
-                    print('Not setup for multi-sonic setup yet')
-                    breakpoint()
+                    self.logError('Not setup for multi-sonic setup yet')
                 self.Instruments[f"instr_{ix}_height"] = sensor.Zm
                 self.Instruments[f"instr_{ix}_north_offset"] = sensor.northOffset
-            if sensor.sensorType == 'sonic-irga':
-                ix += 1
-                self.Instruments[f"instr_{ix}_manufacturer"] = sensor.manufacturer
-                self.Instruments[f"instr_{ix}_model"] = sensor.modelName
-                self.Instruments[f"instr_{ix}_id"] = sensor.sensorID
-            if 'irga' in sensor.sensorType:
-                self.Instruments[f"instr_{ix}_manufacturer"] = sensor.manufacturer
-                self.Instruments[f"instr_{ix}_northward_separation"]=0.00
-                self.Instruments[f"instr_{ix}_eastward_separation"]=0.00
-                self.Instruments[f"instr_{ix}_vertical_separation"]=0.00
-                if sensor.sensorType == 'irga-closed':
-                    self.Instruments[f"instr_{ix}_tube_length"]=0.0
-                    self.Instruments[f"instr_{ix}_tube_diameter"]=0.0
+                ct = coordinateTransformation(Zm=sensor.Zm,northOffset=sensor.northOffset)
+            elif ix == 1:
+                self.logError(f'Reference sonic required for EC systems.  Fix error in {self.Site["site_id"]}')
+            elif ix > 1 and ('irga' in sensor.sensorType or 'fast_t' in sensor.sensorType):
+                n,e = ct.geographicSeparation(sensor.xSeparation,sensor.ySeparation)
+                self.Instruments[f"instr_{ix}_northward_separation"]=n
+                self.Instruments[f"instr_{ix}_eastward_separation"]=e
+                self.Instruments[f"instr_{ix}_vertical_separation"]=sensor.zSeparation
+                if sensor.sensorType == 'irga_closed':
+                    self.Instruments[f"instr_{ix}_tube_length"]=sensor.tubeLength
+                    self.Instruments[f"instr_{ix}_tube_diameter"]=sensor.tubeDiameter
+                    # Set to 0, overwritten with data from the file anyway
                     self.Instruments[f"instr_{ix}_tube_flowrate"]=0.00
+            else:
+                self.logError('Not setup for this edge cases yet')
 
     def getInstrumentList(self):
         # get list of instruments for cross referencing
@@ -153,12 +169,12 @@ class ghgMetadataWriter(baseDataClass,ghgMetadata):
                 self.logMessage('set units, type, etc.')
 
     def variableSelection(self,traces):
-        # map all variables onto preferred vairables (first in list from yamlTranslator *if any present*)
+        # map all variables onto preferred vairables (first in list from ghgTranslator *if any present*)
         vnList = [values['variableName'] for values in traces.values()]
         variables = {
             names[0]:var for var,names in {
                 var:[name for name in names if name in vnList]
-                for var,names in yamlTranslator['variable'].items()
+                for var,names in ghgTranslator['variable'].items()
                 }.items() 
             if len(names)
             }
@@ -166,15 +182,15 @@ class ghgMetadataWriter(baseDataClass,ghgMetadata):
 
     def translate(self,key,value):
         if key in ['measurementType']:
-            for key,v in yamlTranslator[key].items():
+            for key,v in ghgTranslator[key].items():
                 if value in v or value == v:
                     return(key)
             return('')
         elif key == 'instrument':
             for instrument in self.instrumentList:
-                if instrument.rsplit('_')[0] not in yamlTranslator['instrument'].keys():
-                    self.logMessage(f'Add variables for {instrument.rsplit('_')[0]}')
-                elif value in yamlTranslator['instrument'][instrument.rsplit('_')[0]]:
+                if instrument.rsplit('_')[0] not in ghgTranslator['instrument'].keys():
+                    self.logMessage(f'Add variables for {instrument.rsplit("_")[0]}')
+                elif value in ghgTranslator['instrument'][instrument.rsplit("_")[0]]:
                     return(instrument)
             self.logMessage(f'Could not par instrument for {value}')
             return('')

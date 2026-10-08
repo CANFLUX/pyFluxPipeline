@@ -1,23 +1,23 @@
 from scripts.traceAnalysis.firstStage import firstStage
-from scripts.rawFileProcessing.fileTools import fileSearch,fileSet
+from scripts.rawFileProcessing.fileTools import fileSet, fileSearch
 from scripts.newProject import createProject
 from scripts.project import project
 from scripts.siteConfiguration.siteConfiguration import siteConfiguration
 import os
-# from scripts.ecf32.ecf32 import ecf32
 import yaml
+import time
 
 def driveCheck(path):
-    for drive in ['E:','D:','/mnt/d','/mnt/e']:
+    for drive in ['E:','D:','C:/','/mnt/d','/mnt/e','/mtn/c']:
         if os.path.isdir(os.path.join(drive,path)):
             path = os.path.join(drive,path)
         else: drive = None
     if drive is None:
         exit('No drive/mnt present where expected, if using wsl, try: sudo mount -t drvfs D: /mnt/d (or sudo mount -t drvfs E: /mnt/e)')
-
     return(path)
 
 if __name__ == '__main__':
+    T1 = time.time()
     reset = True
     data_dump = driveCheck('data-dump')
     projectPath = 'testing/myProject'
@@ -26,31 +26,42 @@ if __name__ == '__main__':
             reset=reset,
             projectPath=projectPath,
             sitesList=[
-            'configurationFiles/siteTemplates/SCL_template.yml', # Template from preexisting metadata file for SCL
+            # 'configurationFiles/siteTemplates/SCL_template.yml', # Template from preexisting metadata file for SCL
             'configurationFiles/siteTemplates/RDEC1_Seep_template.yml', # Template from preexisting metadata file for RDEC1
+            # 'SEEP'
             ])
 
-    with open('configurationFiles/rawFileSettings/CSFormat.yml') as f:
+    with open('configurationFiles/rawFileSettings/Flux_CSFormat.yml') as f:
         CSFormat = yaml.safe_load(f)
     with open('configurationFiles/rawFileSettings/Time_Series.yml') as f:
         Time_Series = yaml.safe_load(f) 
-    # fileSearch(
-    #     projectPath=projectPath,
-    #     siteID='SEEP',
-    #     searchPath=data_dump+'/RDEC1/2026',        
-    #     **CSFormat
-    # )
 
-    # print('Check ini then proceed')
-    # breakpoint()
-    # SEEP = project(projectPath=projectPath).loadSiteConfiguration('SEEP').updateIni('TOB3_Flux_CSFormat_202606111732')
-    
+    # fileSearch(projectPath=projectPath)
+
     fileSearch(
         projectPath=projectPath,
         siteID='SEEP',
-        searchPath=data_dump+'/RDEC1/2026/20260614',        
-        **Time_Series
+        searchPath=data_dump+'/RDEC1/2026',   
+        debug=True,     
+        **CSFormat
     )
+
+    fS = fileSet(
+        projectPath=projectPath,
+        siteID='SEEP',
+        fileFormat='TOB3'
+    )
+    fS.loadNewDatabaseFiles()
+
+    # print('Check ini then proceed')
+    # SEEP = project(projectPath=projectPath).loadSiteMetadata('SEEP').updateIni('TOB3_Flux_CSFormat_202606111732')
+    
+    # fileSearch(
+    #     projectPath=projectPath,
+    #     siteID='SEEP',
+    #     searchPath=data_dump+'/RDEC1/2026/20260614',        
+    #     **Time_Series
+    # )
     # SeepFlux = discoverFiles(
     #     projectPath=projectPath,
     #     siteID='SEEP',
@@ -75,3 +86,4 @@ if __name__ == '__main__':
 # #     fs = firstStage(projectPath=projectPath,sites='SEEP',years=[2026])
 
 
+    print('Test completed in :',round(time.time()-T1,5),' s')

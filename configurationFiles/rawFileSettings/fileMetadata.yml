@@ -1,0 +1,15 @@
+siteID:
+sourceID: ''
+fileFormat:
+dateStart: ''
+dateStop: ''
+fileTimestamp: ''
+stationName: ''
+fileExtension: ''
+program: ''
+loggerModel: ''
+timezone: 'utc'
+dataIntervalSeconds: .nan
+dataFrequency: '' # Just a classification
+na_values: []
+traces: {}

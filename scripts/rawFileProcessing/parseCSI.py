@@ -5,19 +5,21 @@ from collections import defaultdict
 from helperFunctions.parseFrequency import parseFrequency
 from helperFunctions.baseClass import mdMap
 from scripts.traceAnalysis.traceParameters import rawTrace
-from scripts.rawFileProcessing.sharedFields import sharedFields
+# from scripts.rawFileProcessing.sharedFields import sharedFields
+from scripts.rawFileProcessing.sharedMethods import sharedMethods
 from datetime import datetime
 import pandas as pd
 import numpy as np
 import struct
-import psutil
-import json
+# import psutil
+# import json
 import time
 import re
 import os
 
 @dataclass(kw_only=True)
-class csiTable(sharedFields):
+class csiTable(sharedMethods):
+    fileFormat: str
     campbellBaseTime = 631152000.0      
             
     def parseHeader(self,fileObject):
@@ -35,43 +37,60 @@ class csiTable(sharedFields):
         self.serialNumber=self.header[0][3]
         self.program=self.header[0][5]
 
+    def read(self,fileName):
+        if self.fileFormat == 'TOA5':
+            self.readTOA5(fileName)
+        elif self.fileFormat == 'TOB3':
+            self.readTOB3(fileName)
+        self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)
+        self.dateStart = self.dataTable.index[0]
+        self.dateStop = self.dataTable.index[-1]
+        self.formatMetadata()
+        return (self)
 
+@dataclass(kw_only=True)
 class TOA5(csiTable):
+    fileFormat: str = 'TOA5'
+    headerRows: int = 4
 
-
-    def readTOA5(self):
-        self.fileFormat = 'TOA5'
-        self.headerRows = 4
-        with open(self.fileName,'r') as fileObject:
+    def readTOA5(self,fileName):
+        with open(fileName,'r') as fileObject:
             self.parseHeader(fileObject)
             if self.fileFormat is None:
                 return
-            self.fileTimestamp = datetime.strptime(re.search(r'([0-9]{4}\_[0-9]{2}\_[0-9]{2}\_[0-9]{4})', self.fileName.rsplit('.',1)[0]).group(0),'%Y_%m_%d_%H%M')
+            self.fileTimestamp = datetime.strptime(re.search(r'([0-9]{4}\_[0-9]{2}\_[0-9]{2}\_[0-9]{4})', fileName.rsplit('.',1)[0]).group(0),'%Y_%m_%d_%H%M')
             self.startTime = self.fileTimestamp
             self.tableName = self.header[0][-1]
-            defaultTypes = defaultdict(lambda: '<f4',RECORD ='<u4',TIMESTAMP = 'str')
-            self.dataTable = pd.read_csv(fileObject,dtype=defaultTypes,names=self.header[1])
+            def to_numeric(s):
+                try:
+                    if s.name=='RECORD':
+                        return(s.astype('<u4'))
+                    return(s.astype('<f4'))
+                except ValueError:
+                    return s
+            self.dataTable = pd.read_csv(fileObject,names=self.header[1]).apply(to_numeric)
         self.dataTable['TIMESTAMP'] = pd.to_datetime(self.dataTable['TIMESTAMP'],format='ISO8601')
         self.dataIntervalSeconds = self.dataTable.TIMESTAMP.diff().median().total_seconds()
         self.dataTable.index = self.dataTable['TIMESTAMP']
         if self.traces == {}:
             typeMap = self.dataTable.dtypes
             self.traces = {variable:rawTrace(originalVariable=variable,units=unit,dtype=typeMap[variable]).to_dict() for variable,unit in zip(self.header[1],self.header[2])}
-        # self.close()
 
+
+@dataclass(kw_only=True)
 class TOB3(csiTable):
+    fileFormat: str = 'TOB3'
+    headerRows: int = 6
+    headerSize: int = 12
+    footerSize: int = 4
 
-    def __post_init__(self):
-        self.fileFormat = 'TOB3'
-        super().__post_init__()
-        self.headerRows = 6
-        self.headerSize = 12
-        self.footerSize = 4
+    def readTOB3(self,fileName):
+        self.logMessage(f'Reading: {fileName}')
         self.indexColumns = {variable:rawTrace(originalVariable=variable,units=unit,dtype=dtype).to_dict(keepNull=False) for variable,unit,dtype in [
                     ('POSIX_Time','s','<i4'),('NANOSECONDS','ns','<i4'),('RECORD','','<u4')
                     ]}
-        self.fileSize = os.path.getsize(self.fileName)
-        with open(self.fileName,'rb') as fileObject:
+        self.fileSize = os.path.getsize(fileName)
+        with open(fileName,'rb') as fileObject:
             self.parseHeader(fileObject)
             if self.header[0][0] != self.fileFormat:
                 self.fileFormat = None
@@ -98,16 +117,17 @@ class TOB3(csiTable):
                     tIn = tracesIn.keys()
                     tEx = self.traces.keys()
                     if len([t for t in tIn if t not in tEx]):
-                        self.logError(f"Unexpected traces in {self.fileName}:\n{[t for t in tIn if t not in tEx]} are not defined in configuration file")
+                        self.logError(f"Unexpected traces:\n{[t for t in tIn if t not in tEx]} are not defined in configuration file")
                 self.tracesIn = list(tracesIn.keys())
-            self.startDate = self.fileTimestamp
-            if self.mode == 'extractData':
+            self.dateStart = self.fileTimestamp
+            if self.extractData:
                 self.frameParameters()
                 # Read full file
                 self.streamFrames(fileObject)
-            # else:
-                # Strategy for getting stop time without reading full file?  getmtime doesn't work because its not guranteed to be in same tz as logger
+            else:
+                self.streamFrames(fileObject,stepSize=max(1/self.dataIntervalSeconds,1))
 
+    
     def translateTypes(self,dtypes):
         csiTypeMap = {
                     'FP2':{'struct':'H','output':'<f4'},
@@ -148,7 +168,7 @@ class TOB3(csiTable):
                 frames.append(row)
         if len(frames) == 0:
             return(None,None)
-        elif self.mode!='extractData':
+        elif not self.extractData:
             return(
                 pd.to_datetime((frames[0][0]*1e9)+frames[0][1],unit='ns').floor(freq='1s').to_pydatetime(),
                 pd.to_datetime((frames[-1][0]*1e9)+frames[-1][1],unit='ns').ceil(freq='1s').to_pydatetime()
@@ -160,7 +180,7 @@ class TOB3(csiTable):
             {key:var['dtype'] for key,var in self.indexColumns.items()}
         )
         if self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated().sum():
-            self.logWarning(f"Duplicated timestamps found in {self.fileName} at\n{self.indexTraces[self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)]}\n Replicated indices will be offset by 1ns*(counter) to avoid conflicts")
+            self.logWarning(f"Duplicated timestamps found at\n{self.indexTraces[self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)]}\n Replicated indices will be offset by 1ns*(counter) to avoid conflicts")
             ix = self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)
             rix = self.indexTraces.loc[ix,'RECORD'].astype('int32')
             self.indexTraces.loc[ix,'NANOSECONDS'] += (rix-(rix.min()+1))
@@ -179,72 +199,10 @@ class TOB3(csiTable):
             )
         self.dataTable.index=pd.to_datetime((self.indexTraces['POSIX_Time']*1e9).astype('int64')+self.indexTraces['NANOSECONDS'],unit='ns') 
     
-        # self.logMessage(f'Completed in : {time.time()-T1} s')
-        # breakpoint()
-
-
-    # def readFrames(self,binaryData,firstLast=False):
-    #     # Parameters dictating extraction  
-    #     # self.recordSize = struct.calcsize('>'+self.byteMap)
-    #     # self.recordsPerFrame = int((self.frameSize-self.headerSize-self.footerSize)/self.recordSize)
-    #     # self.byteMap_Body = '>'+''.join([self.byteMap for r in range(self.recordsPerFrame)])
-    #     # Extract the binary data
-            
-    #     tracesIn = {key:self.traces[key] for key in self.tracesIn}
-    #     if firstLast:
-    #         if self.dataIntervalSeconds == 0:
-    #             return(None,None)
-    #         elif self.dataIntervalSeconds < 1:
-    #             # Sample at 1sec resolutoin for expediency to identify the "last" (almost) record
-    #             frames = [f for i in range(0,self.nframes,int(1/min(1,self.dataIntervalSeconds))) for f in 
-    #                 self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
-    #         else:
-    #             frames = [f for i in range(self.nframes) for f in 
-    #                 self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
-
-    #         if len(frames)>1:
-    #             return(
-    #                 pd.to_datetime((frames[0][0][0]*1e9)+frames[0][0][1],unit='ns').floor(freq='1s').to_pydatetime(),
-    #                 pd.to_datetime((frames[-1][0][0]*1e9)+frames[-1][0][1],unit='ns').ceil(freq='1s').to_pydatetime(),
-    #                 )
-    #         else:
-    #             return(None,None)
-      
-    #     # Process frame by frame
-    #     frames = [f for i in range(self.nframes) for f in 
-    #             self.decodeFrame(binaryData[i*self.frameSize:(i+1)*self.frameSize])]
-    #     dataTable = pd.DataFrame(frames,columns=list(self.indexColumns.keys())+list(tracesIn.keys()))
-    #     # Separate indices (parsed from headers) from traces
-    #     self.indexTraces = dataTable[list(self.indexColumns.keys())].astype(
-    #         {key:var['dtype'] for key,var in self.indexColumns.items()}
-    #     )
-    #     if self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated().sum():
-    #         self.logWarning(f"Duplicated timestamps found in {self.fileName} at\n{self.indexTraces[self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)]}\n Replicated indices will be offset by 1ns*(counter) to avoid conflicts")
-    #         ix = self.indexTraces[['POSIX_Time','NANOSECONDS']].duplicated(keep=False)
-    #         rix = self.indexTraces.loc[ix,'RECORD'].astype('int32')
-    #         self.indexTraces.loc[ix,'NANOSECONDS'] += (rix-(rix.min()+1))
-    #         if self.dataIntervalSeconds<1 and self.dataIntervalSeconds > 0:
-    #             self.logError('develop better approach?')
-    #     try:
-    #         self.dataTable = dataTable[list(tracesIn.keys())].astype(
-    #             {key:var['dtype'] for key,var in tracesIn.items()}
-    #         )
-    #     except Exception as e:
-    #         self.logWarning(f'Dtype enforcment failed with error: {e}')
-    #         self.logMessage('Proceeding with errors = ignore')
-    #         self.dataTable = dataTable[list(tracesIn.keys())].astype(
-    #             {key:var['dtype'] for key,var in tracesIn.items()},
-    #             errors='ignore'
-    #         )
-    #     self.dataTable.index=pd.to_datetime((self.indexTraces['POSIX_Time']*1e9).astype('int64')+self.indexTraces['NANOSECONDS'],unit='ns') 
-    
     def decodeFrame(self,frame):
         frame = [struct.unpack('iii', frame[:self.headerSize]),
                  struct.unpack(self.byteMap_Body, frame[self.headerSize:-self.footerSize]),
                  struct.unpack('i',frame[-self.footerSize:])[0]]
-        # frame[0] = [frame[0][0]+frame[0][1]*self.frameResolution+self.campbellBaseTime,frame[0][2]]
-        # Use nanoseconds so timestamp can be stored as int64 instead of float64, avoids floating point precision issues
-        # frame[0] = [int((frame[0][0]+self.campbellBaseTime)*1e9)+int((frame[0][1]*self.frameResolution)*1e9),frame[0][2]]
         frame[0] = [int((frame[0][0]+self.campbellBaseTime)),int((frame[0][1]*self.frameResolution)*1e9),frame[0][2]]
         if 'H' in self.byteMap_Body:
             frame[1] = self.decode_fp2(frame[1])
@@ -376,21 +334,21 @@ class MixedArray(csiTable):
             df = pd.DataFrame(data=data)
             if len(df.index)>self.mxCols:
                 self.mxCols = len(df.index)
-            df['sensorID'] = ''
+            df['instrumentID'] = ''
             for l,sensor in Labels.items():
-                df.loc[df['originalVariable'].str.contains(l),'sensorID']=sensor
+                df.loc[df['originalVariable'].str.contains(l),'instrumentID']=sensor
             df.index = df['originalVariable']
-            if len(self.ignoreTraces):
-                ignore = self.ignoreTraces
-            else:
-                ignore = False
+            # if len(self.ignoreTraces):
+            #     ignore = self.ignoreTraces
+            # else:
+            #     ignore = False
             self.traces = {key:rawTrace(originalVariable=key,units=value['units'],dtype=value['dtype'],ignore=ignore).to_dict() for key,value in df.to_dict('index').items()}
             
             
-    def readArray(self):
+    def readArray(self,fileName):
         # Count by arrayID prefixes to get max cols
         self.mxCols = pd.DataFrame(data=[k.split('-') for k in self.traces.keys()],columns=['Array','Cols']).groupby('Array').count().max().values[0]
-        df = pd.read_csv(self.fileName,header=None,names=[i for i in range(self.mxCols)])
+        df = pd.read_csv(fileName,header=None,names=[i for i in range(self.mxCols)])
         cols = list(self.traces.keys())
         for i,ID in enumerate(df[0].unique()):
             sub = df.loc[df[0]==ID].copy()
@@ -411,3 +369,9 @@ class MixedArray(csiTable):
         typeMap = {var['originalVariable']:var['dtype'] for var in self.traces.values()}
         self.dataTable = self.dataTable.astype(typeMap)
         # self.dataTable.index = self.dataTable.index.tz_localize(self.timezone)
+
+# fn = r"C:\data-dump\RDEC1\2026\20260614\79570.Flux_CSFormat.dat"
+# tbx = TOB3(siteID='SEEP',projectPath='testing/myProject').read(fn)#,fileName=fn)
+# fn = r"C:\temp\test\TOA5_79570.Flux_CSFormat_2026_06_06_1900.dat"
+# tbx = TOA5(siteID='SEEP',projectPath='testing/myProject').read(fn)
+# breakpoint()

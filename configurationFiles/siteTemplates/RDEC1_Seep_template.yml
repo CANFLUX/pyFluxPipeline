@@ -1,47 +1,60 @@
 siteID: SEEP
 lat_lon: [69.319508, -135.478002]
-startDate: &V1_dateIn 2026-06-11T00:00:00+00:00
-stopDate: &V1_dateOut 2026-08-05T00:00:00+00:00
-dataLoggers:
-  main:
-    dateIn: *V1_dateIn
-    dateOut: *V1_dateOut
-    modelName: CR1000x
-    serialNumber: 1
-sensors:
-  IRGASON:
-    modelName: IRGASON
-    serialNumber: 1
-    dateIn: *V1_dateIn
-    dateOut: *V1_dateOut
-    sensorType: sonic-irga
-    Zm: 2.26
-    northOffset: &V1_northOffset35 35
-  LI7700:
-    modelName: LI7700
-    serialNumber: 2
-    dateIn: *V1_dateIn
-    dateOut: *V1_dateOut
-    sensorType: irga
-    northOffset: *V1_northOffset35
-    xSeparation: 0.32
-    ySeparation: 0.125
-    verticalSeparation: 0
-  TC1:
-    modelName: 100K6A1A
-    serialNumber: 3
-    dateIn: *V1_dateIn
-    dateOut: *V1_dateOut
-    sensorType: fast_t_sensor
-    northOffset: *V1_northOffset35
-    xSeparation: 0.5
-    ySeparation: 0.1
-    verticalSeparation: 0
-  HMP35A:
-    modelName: HMP35A
-    serialNumber: 69
-    dateIn: *V1_dateIn
-    dateOut: *V1_dateOut
-    sensorType: biomet
-    xSeparation: 0.5
-    ySeparation: 0.1
+dateStart: &stationInstalled 2026-06-11T00:00:00+00:00
+dateStop: &stationDecommissioned 2026-08-05T00:00:00+00:00
+instrumentation:
+  dataLoggers:
+    main:
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+      modelName: CR1000x
+      serialNumber: 79570
+      stationName: BSP
+  ecSensors:
+    IRGASON:
+      modelName: IRGASON
+      serialNumber: 1
+      referenceSonic: True
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+      Zm: 2.26
+      northOffset: 38.4
+    LI7700:
+      modelName: LI7700
+      serialNumber: 2
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+      xSeparation: 0.32
+      ySeparation: 0.125
+      zSeparation: 0
+    TC1:
+      modelName: 100K6A1A
+      serialNumber: 3
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+      xSeparation: 0.5
+      ySeparation: 0.1
+      zSeparation: 0
+  biometSensors:
+    HMP35A:
+      modelName: HMP35A
+      serialNumber: 69
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    CNR4:
+      modelName: cnr4
+      serialNumber: 69
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    CS310_up:
+      modelName: cs310
+      serialNumber: up
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+    CS310_down:
+      modelName: cs310
+      serialNumber: down
+      dateStart: *stationInstalled
+      dateStop: *stationDecommissioned
+
+

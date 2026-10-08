@@ -95,7 +95,7 @@ if __name__ == '__main__':
         shutil.rmtree('testing/testProject')
     current = createProject.from_cmd(safeMode=False)
     breakpoint()
-    # current.loadSiteConfiguration()
+    # current.loadSiteMetadata()
     
 
     # fileName = r"E:\data-dump\SCL\EddyPro\2024\eddypro_t_full_output_2025-05-02T224906_exp.csv"

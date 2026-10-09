@@ -6,3 +6,4 @@ dateparser
 matplotlib
 statsmodels
 scikit-learn
+tzfpy

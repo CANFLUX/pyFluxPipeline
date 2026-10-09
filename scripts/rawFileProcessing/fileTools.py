@@ -30,17 +30,17 @@ class fileSet(sharedMethods):
         # self.fileInventoryPath = os.path.join(self.metaPath,self.siteID,'.inventory','fileInventory.json')
         # self.fileInventory = self.loadDict(self.fileInventoryPath,template={})
         inventoryPath = [
-            os.path.join(self.metaPath,self.siteID,fq,'.inventory')
-            for fq in ['Database','highFrequency'] if os.path.isdir(os.path.join(self.metaPath,self.siteID,fq,'.inventory.csv'))
+            os.path.join(self.metaPath,self.siteID,fq,'.fileInventory.csv')
+            for fq in ['Database','highFrequency'] if os.path.isfile(os.path.join(self.metaPath,self.siteID,fq,'.fileInventory.csv'))
                          ]
         if len(inventoryPath) == 0:
-            self.fileInventory = pd.DataFrame()
+            self.fileInventory = pd.DataFrame(columns=['dataFrequency','sourceID','fileName','Processed','fileTimestamp']).set_index(['dataFrequency','sourceID'])
         else:
             self.fileInventory = pd.concat([
                 pd.read_csv(inv,parse_dates=['fileTimestamp'],index_col=[0,1])
                 for inv in inventoryPath
             ])
-        self.fileGroups = pd.DataFrame([self.loadDict(os.path.join(self.metaPath,self.siteID,k,f)+'.yml') for k,v in self.fileInventory.items() for f in v.keys()])
+        self.fileGroups = pd.DataFrame([self.loadDict(os.path.join(self.metaPath,self.siteID,k[0],k[1])+'.yml') for k in self.fileInventory.index])
         if 'traces' in self.fileGroups.columns:
             self.fileGroups['traces'] = [json.dumps(tr) for tr in self.fileGroups['traces']]
         self.siteConfig = self.loadSiteMetadata(self.siteID)
@@ -53,9 +53,9 @@ class fileSet(sharedMethods):
                     self.variableInstrumentMap.setdefault(value.instrumentID,[])
 
     def loadNewDatabaseFiles(self):
-        dbx = pd.concat([pd.DataFrame.from_dict(self.fileInventory['Database'][sourceID],columns=[sourceID],orient='index') for sourceID in self.fileInventory['Database'].keys()])
-        # pd.DataFrame.from_dict(self.fileInventory['Database'][sourceID],orient=)
+        dbx = self.fileInventory.loc[self.fileInventory.index.get_level_values('dataFrequency') == 'Database'].copy()
         breakpoint()
+        # pd.DataFrame.from_dict(self.fileInventory['Database'][sourceID],orient=)
 
 @dataclass(kw_only=True)
 class fileSearch(fileSet):
@@ -65,9 +65,10 @@ class fileSearch(fileSet):
 
     def __post_init__(self):
         super().__post_init__()
-        existingFiles =  [file for format in self.fileInventory.values() for sourceSet in format.values() for file in sourceSet['fileName']]
-        newFileMetadata,newFileInventory = self.search(existingFiles)
-        breakpoint()
+        
+        # existingFiles =  [file for format in self.fileInventory.values() for sourceSet in format.values() for file in sourceSet['fileName']]
+        newFileMetadata,newFileInventory = self.search()
+        self.fileInventory = pd.concat([self.fileInventory,newFileInventory])
         # if newFileInventory is not None:
         #     # Append the new Inventory to the current
         #     for (dataFrequency,sourceID),value in newFileInventory.items():
@@ -109,14 +110,22 @@ class fileSearch(fileSet):
                 ep.fill(ghg)
                 # .writeFile(ghg,filepath=fpath.replace('.metadata','.eddypro'))
         # Save updated inventory
-        self.saveDict(self.fileInventory,self.fileInventoryPath)
+        for fq in ['Database','highFrequency']:
+            sel = self.fileInventory.loc[self.fileInventory.index.get_level_values('dataFrequency')==fq].copy()
+            if len(sel):
+                out = os.path.join(self.metaPath,self.siteID,fq)
+                if not os.path.isdir(out):
+                    os.makedirs(out)
+                sel.to_csv(os.path.join(out,'.fileInventory.csv'))
+            # self.saveDict(self.fileInventory.loc[self.fileInventory['dataFrequency']==df],os.path.join(self.metaPath,self.siteID,df,'.fileInventory.csv'))
+        # self.saveDict(self.fileInventory,self.fileInventoryPath)
         # dbI = pd.concat([pd.DataFrame(self.fileInventory['Database'][sourceID]) for sourceID in self.fileInventory['Database'].keys()])
         # pd.DataFrame.from_dict(data={},orient=)
-        # breakpoint()
         
-    def search(self,existingFiles):
+        
+    def search(self):
         newFiles = [os.path.join(dir,file) for dir,_,files in os.walk(self.searchPath) 
-                    for file in files if ((file.endswith(self.fileExtension) and os.path.join(dir,file) not in existingFiles) and
+                    for file in files if ((file.endswith(self.fileExtension) and os.path.join(dir,file) not in self.fileInventory['fileName'].values) and
                         (len(self.findFiles) == 0 or any([fnmatch.fnmatch(file,fnd) for fnd in self.findFiles])) and
                         (len(self.ignoreFiles) == 0 or not any([fnmatch.fnmatch(file,ign) for ign in self.ignoreFiles])) and
                         len(files))]
@@ -124,7 +133,7 @@ class fileSearch(fileSet):
             newFileMetadata = self.getMetadata(newFiles)
             newFileMetadata['Processed'] = False
             newFileMetadata['fileTimestamp'] = newFileMetadata['fileTimestamp'].map(lambda x: x.isoformat())
-            # breakpoint()
+            
             # newFileInventory = newFileMetadata[['dataFrequency','sourceID','fileName','Processed','fileTimestamp']].groupby(['dataFrequency','sourceID']).agg(list).to_dict(orient='index')
             newFileInventory = newFileMetadata[['dataFrequency','sourceID','fileName','Processed','fileTimestamp']].set_index(['dataFrequency','sourceID'])
             return(newFileMetadata.drop(columns=['Processed','fileName','fileTimestamp']),newFileInventory)
@@ -170,15 +179,16 @@ class fileSearch(fileSet):
         # Name reference and configuration yaml
         fileSets['dateStart'] = fileSets['dateStart'].map(lambda x: x.isoformat())
         # Mask duplicates and ffill
-        sourceID_pre_group = fileSets[['dataFrequency','sourceID']].copy()
+        sourceID_pre_group = fileSets[['dataFrequency','sourceID']].rename(columns={'sourceID':'sourceID_pre_group'})
         fileSets.loc[((duplicates)&(referenceFile==False)),['sourceID']] = np.nan
         fileSets[['sourceID']] = fileSets[['sourceID']].ffill().bfill()
-        sourceID_pre_group.index = fileSets['sourceID'].values
+        sourceID_pre_group['sourceID'] = fileSets['sourceID'].copy()
+        sourceID_pre_group = sourceID_pre_group.set_index(['dataFrequency','sourceID'])
+        self.fileInventory = self.fileInventory.reset_index()
         for key,value in sourceID_pre_group.iterrows():
-            if key != value['sourceID']:
-                vx = self.fileInventory[value['dataFrequency']].pop(value['sourceID'])
-                for k,v in vx.items():
-                    self.fileInventory[value['dataFrequency']][key][k]+=v
+            if key[1] != value['sourceID_pre_group']:
+                self.fileInventory.loc[((self.fileInventory['dataFrequency']==key[0]) & (self.fileInventory['sourceID']==value['sourceID_pre_group'])),'sourceID'] = key[1]
+        self.fileInventory = self.fileInventory.set_index(['dataFrequency','sourceID'])
         self.fileGroups = fileSets.groupby(['dataFrequency','sourceID']).first().reset_index()
         self.fileGroups['traces'] = [json.loads(tr) for tr in self.fileGroups['traces']]
         # Write groups that don't yet exist
@@ -200,7 +210,7 @@ class fileSearch(fileSet):
 # fS = fileSearch(useParallel=False,projectPath = 'testing/myProject',siteID='SEEP',searchPath=r'C:\data-dump\RDEC1\2026\20260614',**test)#,variableInstrumentMap={'irgason_1':['Ux','Uy','Uz','T_SONIC']})
 # #     dateStart='2025-06-11T00:00:00+00:00',
 # #     dateStop='2025-08-05T00:00:00+00:00')
-# breakpoint()
+
 
 
 
@@ -227,7 +237,6 @@ class fileSearch(fileSet):
 #         # Read metadata from new inventory, merge with existing groups, or create new ones where applicable
 #         self.groupFiles(newFileMetadata,groupKeys=['tableName','loggerModel','program','fileFormat','dataIntervalSeconds','traces','timezone'])
 #         # Put any new file metadata into a template ini file
-#         breakpoint()
 #         for _,fileGroup in self.fileGroups.loc[self.fileGroups['dataFormat'] == 'Database'].iterrows():
 #             # If new, update first stage ini, otherwise just update dates
 #             if fileGroup['sourceID'] not in self.siteConfig.ini['rawData']['Database'].keys():
@@ -298,7 +307,6 @@ class fileSearch(fileSet):
 
 
 #     def autoLinkInstruments(self,row):
-#         breakpoint()
 #         # vInst = pd.DataFrame({key:pd.Series(value) for key,value in variableInstrumentMap.items()})
 #         # temp = self.siteConfig.instrumentHistory[self.siteConfig.instrumentHistory.index==pd.to_datetime(row['dateStart']).ceil('30min')].iloc[0]
 #         # instruments = pd.Series(
@@ -312,12 +320,12 @@ class fileSearch(fileSet):
 #         #             # assign all to first occurrence, leave to user to correct
 #         #             row['traces'][key]['instrumentID'] = list(instruments[instruments.isin(vInst[vN])].index)#.index[0]
 #         #         # except:
-#         #         #     breakpoint()
+
 #         #         # elif vN.endswith('*') and any(vInst.columns.str.startswith(vN[:-1])):
 #         #         else:
 #         #             mtch = [v for v in vInst.columns[vInst.columns.str.endswith('*')] if vN.startswith(v[:-1])]
 #         #             if len(mtch):
-#         #                 breakpoint()
+
 #         # return row
 
 # @dataclass(kw_only=True)

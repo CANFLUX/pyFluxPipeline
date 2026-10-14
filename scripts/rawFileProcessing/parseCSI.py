@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass,field
 from collections import defaultdict
-from helperFunctions.parseFrequency import parseFrequency
-from helperFunctions.baseClass import mdMap
+from submodules.helperFunctions.parseFrequency import parseFrequency
+from submodules.helperFunctions.baseClass import mdMap
 from scripts.traceAnalysis.traceParameters import rawTrace
 # from scripts.rawFileProcessing.sharedFields import sharedFields
 from scripts.rawFileProcessing.sharedMethods import sharedMethods

@@ -1,5 +1,5 @@
 from scripts.defaultSettings import fileMetadata
-from helperFunctions.baseClass import mdMap
+from submodules.helperFunctions.baseClass import mdMap
 from dataclasses import dataclass,field
 from scripts.project import project
 from datetime import datetime

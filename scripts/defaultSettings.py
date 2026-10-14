@@ -1,4 +1,4 @@
-from helperFunctions.baseClass import fromYamlDefault,fromIniDefault
+from submodules.helperFunctions.baseClass import fromYamlDefault,fromIniDefault
 import os
 
 configPath = os.path.join(os.path.split(__file__)[0].split('scripts')[0],'configurationFiles')

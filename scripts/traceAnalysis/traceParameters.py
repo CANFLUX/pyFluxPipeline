@@ -1,5 +1,5 @@
-from helperFunctions.baseClass import baseDataClass,mdMap
-from helperFunctions.safeFormat import safeFormat,cleanString
+from submodules.helperFunctions.baseClass import baseDataClass,mdMap
+from submodules.helperFunctions.safeFormat import safeFormat,cleanString
 from ruamel.yaml.scalarstring import LiteralScalarString
 from scripts.defaultSettings import defaultSettings, firstStageMetDefaults
 from pandas.api.types import is_numeric_dtype

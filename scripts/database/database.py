@@ -1,5 +1,5 @@
 # from scripts.siteConfiguration.siteConfiguration import siteConfiguration
-# from helperFunctions.baseClass import mdMap
+# from submodules.helperFunctions.baseClass import mdMap
 from dataclasses import dataclass, field
 from scripts.project import project
 # from scripts.defaultSettings import defaultSettings

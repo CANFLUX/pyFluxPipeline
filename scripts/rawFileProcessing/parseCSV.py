@@ -1,7 +1,7 @@
 from scripts.rawFileProcessing.sharedFields import sharedFields
 from scripts.traceAnalysis.traceParameters import rawTrace
-from helperFunctions.safeFormat import cleanString
-from helperFunctions.baseClass import mdMap
+from submodules.helperFunctions.safeFormat import cleanString
+from submodules.helperFunctions.baseClass import mdMap
 # from dataclasses import dataclass, field
 from typing import ClassVar
 import pandas as pd

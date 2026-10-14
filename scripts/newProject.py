@@ -2,7 +2,7 @@
 # from scripts.database.database import database
 from scripts.project import project
 from dataclasses import dataclass, field
-from helperFunctions.baseClass import mdMap
+from submodules.helperFunctions.baseClass import mdMap
 from scripts.siteConfiguration.siteConfiguration import siteMetadata
 from datetime import datetime
 import shutil

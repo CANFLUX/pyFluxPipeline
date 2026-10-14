@@ -1,7 +1,7 @@
 from dataclasses import dataclass#, field, make_dataclass
 from datetime import datetime
 from functools import partial
-from helperFunctions.baseClass import fromYamlDefault
+from submodules.helperFunctions.baseClass import fromYamlDefault
 from typing import Iterable
 import numpy as np
 import random

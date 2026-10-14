@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from dataclasses import field, dataclass
-from helperFunctions.baseClass import baseDataClass
+from submodules.helperFunctions.baseClass import baseDataClass
 from scripts.defaultSettings import defaultSettings
 from scripts.siteConfiguration.siteConfiguration import siteMetadata
 

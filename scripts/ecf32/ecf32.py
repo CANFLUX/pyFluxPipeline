@@ -6,7 +6,7 @@
 # from dataclasses import dataclass, field
 # # from scripts.database.database import database
 # from scripts.ecf32.ghgMetadata import ghgMetadata
-# from helperFunctions.baseClass import baseClassMethods
+# from submodules.helperFunctions.baseClass import baseClassMethods
 
 
 # # biometHeader = baseClassMethods().loadDict(os.path.join(os.path.split(__file__)[0],'Biomet.yml'))

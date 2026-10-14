@@ -3,7 +3,7 @@ import numpy as np
 from datetime import datetime
 from configparser import ConfigParser
 from dataclasses import dataclass
-from helperFunctions.baseClass import baseDataClass
+from submodules.helperFunctions.baseClass import baseDataClass
 from scripts.defaultSettings import eddyproTemplate, ghgTemplate, ghgTranslator
 
 # def getSec(cfg,sec):

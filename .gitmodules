@@ -1,6 +1,6 @@
 [submodule "helperFunctions"]
-	path = helperFunctions
+	path = submodules/helperFunctions
 	url = https://github.com/June-Skeeter/helperFunctions.git
 [submodule "SunStatistics"]
-	path = SunStatistics
+	path = submodules/SunStatistics
 	url = https://github.com/June-Skeeter/SunStatistics.git

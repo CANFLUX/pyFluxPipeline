@@ -7,3 +7,7 @@ matplotlib
 statsmodels
 scikit-learn
 tzfpy
+netCDF4
+siphon
+xarray
+folium

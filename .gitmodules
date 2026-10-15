@@ -7,6 +7,3 @@
 [submodule "submodules/ECCC_Data_Downloader"]
 	path = submodules/ECCC_Data_Downloader
 	url = https://github.com/June-Skeeter/ECCC_Data_Downloader.git
-[submodule "submodules/NARR_Data_Download"]
-	path = submodules/NARR_Data_Download
-	url = https://github.com/June-Skeeter/NARR_Data_Download.git

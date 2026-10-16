@@ -11,3 +11,5 @@ netCDF4
 siphon
 xarray
 folium
+rasterio
+rioxarray

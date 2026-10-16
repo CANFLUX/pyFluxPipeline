@@ -7,3 +7,6 @@
 [submodule "submodules/ECCC_Data_Downloader"]
 	path = submodules/ECCC_Data_Downloader
 	url = https://github.com/June-Skeeter/ECCC_Data_Downloader.git
+[submodule "submodules/ERA5_Data_Downloader"]
+	path = submodules/ERA5_Data_Downloader
+	url = https://github.com/June-Skeeter/ERA5_Data_Downloader.git

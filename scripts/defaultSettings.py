@@ -4,7 +4,11 @@ import os
 configPath = os.path.join(os.path.split(__file__)[0].split('scripts')[0],'configurationFiles')
 
 defaultSettings = fromYamlDefault(os.path.join(configPath,'defaults',"defaultSettings.yml"))
+projectTemplate = fromYamlDefault(os.path.join(configPath,'defaults','projectTemplate.yml'),asDataclass=False)
 firstStageMetDefaults = fromYamlDefault(os.path.join(configPath,'defaults',"firstStageMetDefaults.yml"),asDataclass=False)
+
+siteConfiguration = fromYamlDefault(os.path.join(configPath,'siteTemplates','siteConfiguration.yml'))
+
 
 eddyproTemplate = fromIniDefault(os.path.join(configPath,'ghgTemplates','eddyproTemplate.eddypro'))
 ghgTemplate = fromIniDefault(os.path.join(configPath,'ghgTemplates','ghgTemplate.metadata'))

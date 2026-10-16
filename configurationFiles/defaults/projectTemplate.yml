@@ -1,0 +1,10 @@
+projectPath: 
+  Database: 
+    Calculation_Procedures: 
+      TraceAnalysis_ini: 
+  Sites: 
+  AuxillaryData: 
+    ERA5: 
+    ECCC: 
+  'projectConfig.yml': [{createdBy: 'June Skeeter',PIs: ['June Skeeter','Peter Morse']}] # list bracke stops mapping chain
+  'siteCoordinates.geojson': {}

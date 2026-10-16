@@ -8,12 +8,12 @@ import os
 
 @dataclass(kw_only=True)
 class firstStage(database):
-    sites: list
+    # sites: list
     years: list = None
 
     def __post_init__(self):
         super().__post_init__()
-        for siteID in self.sites:
+        for siteID in self.Sites.keys():
             T1 = time()
             # load site configuration
             siteConfig = self.loadSiteMetadata(siteID)

@@ -3,8 +3,7 @@ from scripts.traceAnalysis.traceParameters import firstStageTrace
 from scripts.siteConfiguration.hardware import hardwareModels
 from ruamel.yaml.scalarstring import LiteralScalarString
 from scripts.ecf32.ghgMetadata import ghgMetadataWriter
-from submodules.helperFunctions.baseClass import fromYamlDefault
-from scripts.defaultSettings import defaultSettings
+from scripts.defaultSettings import defaultSettings, siteConfiguration
 from scripts.defaultSettings import configPath
 from ruamel.yaml.comments import CommentedSeq
 from dataclasses import dataclass, field
@@ -39,14 +38,10 @@ class configTemplate:
         # if isinstance(self.Metadata,str):
         self.Metadata = configMetadata(**self.Metadata).__dict__
 
-siteConfiguration = fromYamlDefault(
-    os.path.join(configPath,'siteTemplates','siteConfiguration.yml'),
-)
-
 @dataclass(kw_only=True)
 class siteMetadata(baseDataClass,siteConfiguration,defaultSettings):
     projectPath: str = field(repr=False)
-    lat_lon: spatialObject
+    lat_lon: spatialObject = field(default_factory=lambda:siteConfiguration.lat_lon)
     saveUpdates: bool = field(default=True,repr=False)
 
     def __post_init__(self):

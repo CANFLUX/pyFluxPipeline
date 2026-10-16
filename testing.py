@@ -1,7 +1,7 @@
 from scripts.traceAnalysis.firstStage import firstStage
 from scripts.rawFileProcessing.fileTools import fileSet, fileSearch
-from scripts.newProject import createProject
-from scripts.project import project
+# from scripts.newProject import createProject
+from scripts.project import project, newProject
 from scripts.siteConfiguration.siteConfiguration import siteConfiguration
 import os
 import yaml
@@ -22,19 +22,31 @@ if __name__ == '__main__':
     data_dump = driveCheck('data-dump')
     projectPath = 'testing/myProject'
     if reset:
-        createProject(
+        pr = newProject(
             reset=reset,
-            projectPath=projectPath,
-            sitesList=[
-            # 'configurationFiles/siteTemplates/SCL_template.yml', # Template from preexisting metadata file for SCL
-            'configurationFiles/siteTemplates/RDEC1_Seep_template.yml', # Template from preexisting metadata file for RDEC1
-            # 'SEEP'
-            ])
+            projectPath=projectPath
+        )
+        for siteID,kwargs in {
+            'ILL':{'dateStart':'2016-07-08T00:00:00+00:00','dateStop':'2016-08-08T00:00:00+00:00','lat_lon':[69.47983, -134.58800]},
+            'FIL':{'dateStart':'2017-06-19T00:00:00+00:00','dateStop':'2017-09-15T00:00:00+00:00','lat_lon':[69.37228, -134.88092]},
+            'SCL':'configurationFiles/siteTemplates/SCL_template.yml',
+            'BSP':'configurationFiles/siteTemplates/RDEC1_Seep_template.yml'}.items():
+            pr.newSite(siteID,kwargs)
+        # createProject(
+        #     reset=reset,
+        #     projectPath=projectPath,
+        #     sitesList=[
+        #     # 'configurationFiles/siteTemplates/SCL_template.yml', # Template from preexisting metadata file for SCL
+        #     'configurationFiles/siteTemplates/RDEC1_Seep_template.yml', # Template from preexisting metadata file for RDEC1
+        #     # 'SEEP'
+        #     ])
+    pr = project(projectPath=projectPath).initalize()
+    breakpoint()
 
     with open('configurationFiles/rawFileSettings/Flux_CSFormat.yml') as f:
         CSFormat = yaml.safe_load(f)
     with open('configurationFiles/rawFileSettings/Time_Series.yml') as f:
-        Time_Series = yaml.safe_load(f) 
+        Time_Series = yaml.safe_load(f)
 
     # fileSearch(projectPath=projectPath)
 
